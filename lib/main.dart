@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'providers/jadwal_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/antrian_provider.dart';
+import 'providers/notifikasi_provider.dart';
 import 'providers/riwayat_provider.dart';
 import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
@@ -21,6 +22,7 @@ class AmpiraApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => JadwalProvider()),
         ChangeNotifierProvider(create: (_) => AntrianProvider()),
+        ChangeNotifierProvider(create: (_) => NotifikasiProvider()),
         ChangeNotifierProvider(create: (_) => RiwayatProvider()),
       ],
       child: MaterialApp(

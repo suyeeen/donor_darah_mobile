@@ -5,11 +5,13 @@ import '../models/riwayat_donor.dart';
 import '../providers/antrian_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/jadwal_provider.dart';
+import '../providers/notifikasi_provider.dart';
 import '../providers/riwayat_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/jadwal_card.dart';
 import 'cari_jadwal_screen.dart';
 import 'detail_jadwal_screen.dart';
+import 'notifikasi_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,11 +29,107 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       context.read<JadwalProvider>().cariJadwal();
       context.read<AntrianProvider>().muatAntrianSaya();
       context.read<RiwayatProvider>().muatRiwayat();
+
+      final notifProvider = context.read<NotifikasiProvider>();
+      await notifProvider.muatNotifikasi();
+      await notifProvider.cekSudahTanyaIzinDevice();
+      if (!notifProvider.sudahTanyaIzinDevice && mounted) {
+        _tampilkanDialogIzinNotifikasi();
+      }
     });
+  }
+
+  void _tampilkanDialogIzinNotifikasi() {
+    final notifProvider = context.read<NotifikasiProvider>();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: InkWell(
+                  onTap: () => Navigator.pop(dialogContext),
+                  child: const Icon(Icons.close, size: 20),
+                ),
+              ),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.tabInactiveBg,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.notifications_outlined,
+                  size: 26,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Aktifkan Notifikasi pada Device',
+                style: AppText.headline.copyWith(fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        notifProvider.tandaiSudahTanyaIzinDevice();
+                        Navigator.pop(dialogContext);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Tidak'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        // TODO: sambungin ke request izin notifikasi device
+                        // asli (mis. firebase_messaging / permission_handler)
+                        // begitu paket push notification dipasang.
+                        notifProvider.tandaiSudahTanyaIzinDevice();
+                        Navigator.pop(dialogContext);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Ya'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -79,6 +177,8 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _buildGreetingHeader(pendonor?.nama),
+          const SizedBox(height: 20),
           _buildStatCard(
             golonganDarah: pendonor?.golonganDarah ?? '-',
             siapDonor: true,
@@ -585,6 +685,89 @@ class _HomeScreenState extends State<HomeScreen> {
     final j = waktu.hour.toString().padLeft(2, '0');
     final m = waktu.minute.toString().padLeft(2, '0');
     return '$j:$m';
+  }
+
+  Widget _buildGreetingHeader(String? nama) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Halo !! 👋',
+                style: AppText.inputText.copyWith(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                nama?.isNotEmpty == true ? nama! : 'Nama Pengguna',
+                style: AppText.headline.copyWith(fontSize: 22),
+              ),
+            ],
+          ),
+        ),
+        _buildNotifikasiButton(),
+      ],
+    );
+  }
+
+  Widget _buildNotifikasiButton() {
+    final jumlahBelumDibaca = context
+        .watch<NotifikasiProvider>()
+        .jumlahBelumDibaca;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const NotifikasiScreen()),
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.inputBorder),
+            ),
+            child: const Icon(
+              Icons.notifications_outlined,
+              size: 20,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          if (jumlahBelumDibaca > 0)
+            Positioned(
+              top: -2,
+              right: -2,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                child: Text(
+                  '$jumlahBelumDibaca',
+                  textAlign: TextAlign.center,
+                  style: AppText.chip.copyWith(
+                    color: Colors.white,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _buildStatCard({
