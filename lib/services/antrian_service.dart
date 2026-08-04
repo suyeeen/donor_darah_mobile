@@ -35,6 +35,10 @@ class AntrianService {
       status: StatusAntrian.dipanggil,
       qrCode: 'QR-DEMO-A019',
       batasWaktuCheckin: DateTime.now().add(const Duration(minutes: 12)),
+      // Status "dipanggil" = giliran sekarang, jadi gak ada lagi orang
+      // di depan & estimasi waktu tunggu.
+      jumlahDidepan: 0,
+      estimasiMenit: 0,
     ),
   ];
 

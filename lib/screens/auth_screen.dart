@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
+import '../providers/notifikasi_provider.dart';
+import '../widgets/notifikasi_permission_dialog.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -78,6 +80,18 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!mounted) return;
 
     if (sukses) {
+      // Popup izin notifikasi ditampilkan DI SINI, tepat setelah registrasi
+      // sukses -- sebelum pindah ke Home. Dicek dulu lewat flag
+      // sudahTanyaIzinDevice biar gak nanya dua kali kalau nanti pendonor
+      // juga lewat ETiketScreen (flag-nya sama, tersimpan di SharedPreferences).
+      final notifProvider = context.read<NotifikasiProvider>();
+      await notifProvider.cekSudahTanyaIzinDevice();
+      if (!notifProvider.sudahTanyaIzinDevice && mounted) {
+        await showNotifikasiPermissionDialog(context);
+      }
+
+      if (!mounted) return;
+
       // TODO: idealnya lempar ke screen "Lengkapi Profil" dulu (tanggal
       // lahir, jenis kelamin, golongan darah -- FR-2.1) sebelum ke Home,
       // karena data itu belum dikumpulkan di form registrasi ini.

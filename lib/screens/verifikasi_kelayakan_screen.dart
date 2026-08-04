@@ -103,7 +103,7 @@ class VerifikasiKelayakanScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'LANGKAH 4 DARI 10',
+                'LANGKAH 4 DARI 5',
                 style: AppText.label.copyWith(
                   color: AppColors.primary,
                   letterSpacing: 1.4,

@@ -1,7 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/antrian_donor.dart';
 import '../models/jadwal_donor.dart';
+import '../providers/antrian_provider.dart';
 import '../providers/notifikasi_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/notifikasi_permission_dialog.dart';
@@ -23,20 +25,42 @@ class _ETiketScreenState extends State<ETiketScreen> {
 
   // GAP: nomor antrian seharusnya datang dari response API "ambil nomor
   // antrian" (FR-4.2), bukan dibikin di client. Mock ini cuma buat preview UI.
-  String get _nomorAntrian {
-    final acak =
-        Random(jadwal.idJadwal + slot.jamMulai.hashCode).nextInt(999) + 1;
-    return 'A-${acak.toString().padLeft(3, '0')}';
-  }
+  int get _nomorUrutAntrian =>
+      Random(jadwal.idJadwal + slot.jamMulai.hashCode).nextInt(999) + 1;
+
+  String get _nomorAntrian =>
+      'A-${_nomorUrutAntrian.toString().padLeft(3, '0')}';
 
   @override
   void initState() {
     super.initState();
-    // Pendonor baru aja SELESAI MENDAFTAR (dapat nomor antrian) -- ini
-    // titik paling relevan buat nawarin notifikasi device, karena mulai
-    // dari sini pendonor butuh kabar realtime soal posisi antriannya
-    // sampai gilirannya selesai.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+
+      // Daftarin antrian yang baru diambil ini ke AntrianProvider, biar
+      // langsung muncul di tab "Antrian" pas kembali ke Home -- sebelumnya
+      // e-tiket cuma tampil di layar ini doang lalu hilang begitu ditutup.
+      final jumlahDidepan = slot.pendaftar;
+      context.read<AntrianProvider>().tambahAntrianBaru(
+        AntrianDonor(
+          idAntrian: DateTime.now().millisecondsSinceEpoch,
+          jadwal: jadwal,
+          nomorUrut: _nomorUrutAntrian,
+          status: StatusAntrian.menunggu,
+          qrCode: 'QR-DEMO-$_nomorAntrian',
+          batasWaktuCheckin: null,
+          jumlahDidepan: jumlahDidepan,
+          // ASUMSI: rata-rata 8 menit per pendonor (skrining + proses
+          // donor). Gak ada acuan resmi dari PMI/FRD -- sesuaikan kalau
+          // ada standar waktu proses yang lebih akurat.
+          estimasiMenit: jumlahDidepan * 8,
+        ),
+      );
+
+      // Pendonor baru aja SELESAI MENDAFTAR (dapat nomor antrian) -- ini
+      // titik fallback buat nawarin notifikasi device (trigger utamanya
+      // sekarang di AuthScreen abis registrasi). Gak akan muncul dobel,
+      // karena dicek lewat flag sudahTanyaIzinDevice yang sama.
       final notifProvider = context.read<NotifikasiProvider>();
       await notifProvider.cekSudahTanyaIzinDevice();
       if (!notifProvider.sudahTanyaIzinDevice && mounted) {

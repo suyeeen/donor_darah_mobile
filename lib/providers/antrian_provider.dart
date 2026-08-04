@@ -23,4 +23,14 @@ class AntrianProvider extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  /// Dipanggil dari ETiketScreen begitu pendonor selesai ambil nomor
+  /// antrian, biar langsung muncul di tab "Antrian" pas kembali ke Home --
+  /// tanpa perlu re-fetch dari service (yang datanya masih dummy statis).
+  /// Ditaruh di paling depan list biar antrian terbaru muncul duluan.
+  void tambahAntrianBaru(AntrianDonor antrian) {
+    daftarAntrian = [antrian, ...daftarAntrian];
+    status = AntrianStatusFetch.loaded;
+    notifyListeners();
+  }
 }

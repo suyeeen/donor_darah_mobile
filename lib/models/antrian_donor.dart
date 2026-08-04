@@ -17,6 +17,14 @@ class AntrianDonor {
   final String qrCode;
   final DateTime? batasWaktuCheckin;
 
+  // BARU: representasi posisi antrian real-time, dipakai di tab Antrian
+  // (Home) buat nampilin "Di depan: X orang" & "Estimasi: Y mnt".
+  // GAP: idealnya backend yang hitung dari COUNT(antrian) yang
+  // nomor_urut-nya lebih kecil & status masih 'menunggu' di jadwal yang
+  // sama -- di sini masih nilai yang dimock/dihitung kasar di client.
+  final int jumlahDidepan;
+  final int estimasiMenit;
+
   const AntrianDonor({
     required this.idAntrian,
     required this.jadwal,
@@ -24,6 +32,8 @@ class AntrianDonor {
     required this.status,
     required this.qrCode,
     this.batasWaktuCheckin,
+    required this.jumlahDidepan,
+    required this.estimasiMenit,
   });
 
   String get nomorAntrian => 'A-${nomorUrut.toString().padLeft(3, '0')}';

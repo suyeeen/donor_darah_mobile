@@ -66,7 +66,7 @@ class KuesionerIntroScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'LANGKAH 2 DARI 10',
+                'LANGKAH 2 DARI 5',
                 style: AppText.label.copyWith(
                   color: AppColors.primary,
                   letterSpacing: 1.4,
