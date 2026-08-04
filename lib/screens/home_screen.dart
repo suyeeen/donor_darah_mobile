@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/antrian_donor.dart';
+import '../models/pendonor.dart';
 import '../models/riwayat_donor.dart';
 import '../providers/antrian_provider.dart';
 import '../providers/auth_provider.dart';
@@ -9,9 +10,12 @@ import '../providers/notifikasi_provider.dart';
 import '../providers/riwayat_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/jadwal_card.dart';
+import 'auth_screen.dart';
 import 'cari_jadwal_screen.dart';
 import 'detail_jadwal_screen.dart';
+import 'kelola_perangkat_screen.dart';
 import 'notifikasi_screen.dart';
+import 'profil_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,7 +25,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _navIndex = 0; // 0 Jadwal, 1 Antrian, 2 Riwayat
+  int _navIndex = 0; // 0 Jadwal, 1 Antrian, 2 Riwayat, 3 Pengaturan
   String _filterLokasi = 'Semua';
 
   static const _filterOptions = ['Semua', 'Bandung', 'Jember'];
@@ -55,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildJadwalTab(),
                   _buildAntrianTab(),
                   _buildRiwayatTab(),
+                  _buildPengaturanTab(),
                 ],
               ),
             ),
@@ -791,6 +796,366 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ------------------------------------------------------------------
+  // TAB 4: PENGATURAN (FR-1.4, FR-2.1, FR-2.3)
+  // ------------------------------------------------------------------
+
+  Widget _buildPengaturanTab() {
+    final auth = context.watch<AuthProvider>();
+    final notif = context.watch<NotifikasiProvider>();
+    final pendonor = auth.pendonor;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(21, 20, 21, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Pengaturan', style: AppText.headline.copyWith(fontSize: 22)),
+          const SizedBox(height: 20),
+          _buildProfilRingkas(pendonor),
+          const SizedBox(height: 24),
+          _sectionLabel('Akun'),
+          const SizedBox(height: 10),
+          _buildMenuGroup([
+            _MenuItemData(
+              icon: Icons.person_outline,
+              label: 'Profil saya',
+              subtitle: 'Data diri & kesehatan dasar',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfilScreen()),
+              ),
+            ),
+            _MenuItemData(
+              icon: Icons.devices_outlined,
+              label: 'Kelola perangkat  masih perbaikan ',
+              subtitle: 'Lihat & keluar dari sesi lain',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const KelolaPerangkatScreen(),
+                ),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 20),
+          _sectionLabel('Preferensi'),
+          const SizedBox(height: 10),
+          _buildToggleTile(
+            icon: Icons.notifications_outlined,
+            label: 'Notifikasi push',
+            subtitle: 'Kabar status antrian secara real-time',
+            aktif: notif.notifikasiAktif,
+            onChanged: (value) {
+              if (value) {
+                notif.aktifkanNotifikasi();
+              } else {
+                notif.nonaktifkanNotifikasi();
+              }
+            },
+          ),
+          const SizedBox(height: 20),
+          _sectionLabel('Lainnya'),
+          const SizedBox(height: 10),
+          _buildMenuGroup([
+            _MenuItemData(
+              icon: Icons.help_outline,
+              label: 'Bantuan & dukungan',
+              subtitle: 'FAQ dan kontak PMI/UDD',
+              onTap: () => _tampilkanInfoSederhana(
+                judul: 'Bantuan & Dukungan',
+                pesan:
+                    'Butuh bantuan? Hubungi call center PMI di 021-xxxxxxx '
+                    'atau datangi kantor terdekat.\n\n)',
+              ),
+            ),
+            _MenuItemData(
+              icon: Icons.privacy_tip_outlined,
+              label: 'Kebijakan privasi',
+              subtitle: 'Cara data Anda dikelola',
+              onTap: () => _tampilkanInfoSederhana(
+                judul: 'Kebijakan Privasi',
+                pesan:
+                    'Data pribadi dan kesehatan Anda hanya diakses oleh '
+                    'Anda, petugas skrining lokasi terkait, dan admin '
+                    'berwenang.',
+              ),
+            ),
+            _MenuItemData(
+              icon: Icons.info_outline,
+              label: 'Tentang aplikasi',
+              subtitle: '',
+              onTap: () => _tampilkanInfoSederhana(
+                judul: 'Tentang Donor',
+                pesan:
+                    ' -- Sistem Antrian Online Donor Darah\nVersi '
+                    '1.0.0\n\nTerintegrasi dengan PMI/UDD untuk pendaftaran '
+                    'dan pelacakan antrian donor darah secara real-time.',
+              ),
+            ),
+          ]),
+          const SizedBox(height: 28),
+          _buildTombolLogout(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfilRingkas(Pendonor? pendonor) {
+    final nama = (pendonor?.nama.isNotEmpty ?? false)
+        ? pendonor!.nama
+        : 'Nama Pengguna';
+    final inisial = nama.trim().isNotEmpty ? nama.trim()[0].toUpperCase() : '?';
+    final noTelepon = pendonor?.noTelepon ?? '-';
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ProfilScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardDark,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                inisial,
+                style: AppText.statValue.copyWith(fontSize: 20),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    nama,
+                    style: AppText.inputText.copyWith(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    noTelepon,
+                    style: AppText.statLabelSmall.copyWith(
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionLabel(String label) {
+    return Text(
+      label.toUpperCase(),
+      style: AppText.statLabel.copyWith(
+        color: AppColors.neutralMuted,
+        letterSpacing: 0.8,
+      ),
+    );
+  }
+
+  Widget _buildMenuGroup(List<_MenuItemData> items) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            _buildMenuTile(items[i]),
+            if (i != items.length - 1)
+              const Divider(height: 1, color: AppColors.inputBorder),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuTile(_MenuItemData item) {
+    return InkWell(
+      onTap: item.onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(item.icon, size: 20, color: AppColors.textPrimary),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.label,
+                    style: AppText.inputText.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(item.subtitle, style: AppText.helper),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: AppColors.neutralMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggleTile({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required bool aktif,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.textPrimary),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: AppText.inputText.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(subtitle, style: AppText.helper),
+              ],
+            ),
+          ),
+          Switch(
+            value: aktif,
+            onChanged: onChanged,
+            activeColor: AppColors.primary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTombolLogout() {
+    return SizedBox(
+      height: 48,
+      child: OutlinedButton.icon(
+        onPressed: _konfirmasiLogout,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: const BorderSide(color: AppColors.primary),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        icon: const Icon(Icons.logout, size: 18),
+        label: Text('Keluar akun', style: AppText.button),
+      ),
+    );
+  }
+
+  void _tampilkanInfoSederhana({required String judul, required String pesan}) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(judul, style: AppText.headline.copyWith(fontSize: 16)),
+        content: Text(pesan, style: AppText.helper),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _konfirmasiLogout() async {
+    final konfirmasi = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Keluar dari akun?',
+          style: AppText.headline.copyWith(fontSize: 16),
+        ),
+        content: Text(
+          'Anda perlu masuk kembali dengan nomor ponsel dan kata sandi '
+          'untuk mengakses akun ini.',
+          style: AppText.helper,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Keluar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (konfirmasi != true) return;
+    if (!mounted) return;
+
+    await context.read<AuthProvider>().logout();
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthScreen()),
+      (route) => false,
+    );
+  }
+
+  // ------------------------------------------------------------------
   // WIDGET BERSAMA
   // ------------------------------------------------------------------
 
@@ -1128,6 +1493,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildNavItem(0, Icons.calendar_month_outlined, 'Jadwal'),
             _buildNavItem(1, Icons.confirmation_number_outlined, 'Antrian'),
             _buildNavItem(2, Icons.history, 'Riwayat'),
+            _buildNavItem(3, Icons.settings_outlined, 'Pengaturan'),
           ],
         ),
       ),
@@ -1154,4 +1520,21 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
+
+/// Data satu baris menu di tab Pengaturan (lihat _buildMenuGroup /
+/// _buildMenuTile). Cuma dipakai internal HomeScreen, jadi ditaruh di file
+/// yang sama daripada bikin file terpisah buat satu class kecil.
+class _MenuItemData {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _MenuItemData({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
 }

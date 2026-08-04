@@ -69,4 +69,13 @@ class NotifikasiProvider extends ChangeNotifier {
     notifikasiAktif = true;
     notifyListeners();
   }
+
+  /// Dipakai toggle di PengaturanScreen buat matiin notifikasi lagi kalau
+  /// user berubah pikiran setelah sebelumnya mengizinkan.
+  Future<void> nonaktifkanNotifikasi() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyNotifikasiAktif, false);
+    notifikasiAktif = false;
+    notifyListeners();
+  }
 }

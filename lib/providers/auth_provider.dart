@@ -3,7 +3,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pendonor.dart';
 import '../services/auth_service.dart';
 
-enum AuthStatus { unknown, unauthenticated, authenticating, authenticated, error }
+enum AuthStatus {
+  unknown,
+  unauthenticated,
+  authenticating,
+  authenticated,
+  error,
+}
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _service = AuthService();
@@ -44,7 +50,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final hasil = await _service.login(identitas: identitas, password: password);
+      final hasil = await _service.login(
+        identitas: identitas,
+        password: password,
+      );
       token = hasil['token'] as String;
       pendonor = hasil['pendonor'] as Pendonor;
       await _simpanToken(token!);
@@ -103,6 +112,25 @@ class AuthProvider extends ChangeNotifier {
     pendonor = null;
     status = AuthStatus.unauthenticated;
     notifyListeners();
+  }
+
+  /// GAP: masih UI-only. Nyimpen perubahan profil (FR-2.1) cuma ke state
+  /// lokal (in-memory), TIDAK dikirim ke server -- makanya begitu app
+  /// ditutup & dibuka lagi (atau logout), perubahan ini hilang lagi jadi
+  /// data mock dari AuthService. Besok kalau endpoint PUT /pendonor/profil
+  /// udah ada, ganti body method ini jadi manggil AuthService lalu update
+  /// `pendonor` dari response server (bukan dari objek yang dioper UI).
+  Future<bool> simpanProfil(Pendonor dataBaru) async {
+    if (pendonor == null) return false;
+    status = AuthStatus.authenticating;
+    notifyListeners();
+
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    pendonor = dataBaru;
+    status = AuthStatus.authenticated;
+    notifyListeners();
+    return true;
   }
 
   Future<void> _simpanToken(String value) async {
