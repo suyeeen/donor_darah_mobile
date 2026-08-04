@@ -1,14 +1,25 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/jadwal_donor.dart';
+import '../providers/notifikasi_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/notifikasi_permission_dialog.dart';
 import 'pilih_slot_waktu_screen.dart';
 
-class ETiketScreen extends StatelessWidget {
+class ETiketScreen extends StatefulWidget {
   final JadwalDonor jadwal;
   final SlotWaktu slot;
 
   const ETiketScreen({super.key, required this.jadwal, required this.slot});
+
+  @override
+  State<ETiketScreen> createState() => _ETiketScreenState();
+}
+
+class _ETiketScreenState extends State<ETiketScreen> {
+  JadwalDonor get jadwal => widget.jadwal;
+  SlotWaktu get slot => widget.slot;
 
   // GAP: nomor antrian seharusnya datang dari response API "ambil nomor
   // antrian" (FR-4.2), bukan dibikin di client. Mock ini cuma buat preview UI.
@@ -16,6 +27,22 @@ class ETiketScreen extends StatelessWidget {
     final acak =
         Random(jadwal.idJadwal + slot.jamMulai.hashCode).nextInt(999) + 1;
     return 'A-${acak.toString().padLeft(3, '0')}';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Pendonor baru aja SELESAI MENDAFTAR (dapat nomor antrian) -- ini
+    // titik paling relevan buat nawarin notifikasi device, karena mulai
+    // dari sini pendonor butuh kabar realtime soal posisi antriannya
+    // sampai gilirannya selesai.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final notifProvider = context.read<NotifikasiProvider>();
+      await notifProvider.cekSudahTanyaIzinDevice();
+      if (!notifProvider.sudahTanyaIzinDevice && mounted) {
+        showNotifikasiPermissionDialog(context);
+      }
+    });
   }
 
   @override

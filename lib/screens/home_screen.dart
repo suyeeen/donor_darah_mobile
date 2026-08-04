@@ -29,107 +29,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    // NOTE: dialog izin notifikasi device SUDAH DIPINDAH ke ETiketScreen,
+    // muncul sekali begitu pendonor selesai mendaftar antrian (bukan di
+    // sini lagi) -- lihat showNotifikasiPermissionDialog().
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<JadwalProvider>().cariJadwal();
       context.read<AntrianProvider>().muatAntrianSaya();
       context.read<RiwayatProvider>().muatRiwayat();
-
-      final notifProvider = context.read<NotifikasiProvider>();
-      await notifProvider.muatNotifikasi();
-      await notifProvider.cekSudahTanyaIzinDevice();
-      if (!notifProvider.sudahTanyaIzinDevice && mounted) {
-        _tampilkanDialogIzinNotifikasi();
-      }
+      context.read<NotifikasiProvider>().muatNotifikasi();
     });
-  }
-
-  void _tampilkanDialogIzinNotifikasi() {
-    final notifProvider = context.read<NotifikasiProvider>();
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: InkWell(
-                  onTap: () => Navigator.pop(dialogContext),
-                  child: const Icon(Icons.close, size: 20),
-                ),
-              ),
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: AppColors.tabInactiveBg,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.notifications_outlined,
-                  size: 26,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Aktifkan Notifikasi pada Device',
-                style: AppText.headline.copyWith(fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        notifProvider.tandaiSudahTanyaIzinDevice();
-                        Navigator.pop(dialogContext);
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text('Tidak'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // TODO: sambungin ke request izin notifikasi device
-                        // asli (mis. firebase_messaging / permission_handler)
-                        // begitu paket push notification dipasang.
-                        notifProvider.tandaiSudahTanyaIzinDevice();
-                        Navigator.pop(dialogContext);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text('Ya'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -299,102 +207,305 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildAntrianCard(AntrianDonor antrian) {
-    final statusInfo = _statusAntrianInfo(antrian.status);
-    final urgent = antrian.status == StatusAntrian.dipanggil;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildStatusUtamaCard(antrian),
+        const SizedBox(height: 16),
+        _buildTimelineCard(antrian),
+        const SizedBox(height: 16),
+        _buildTombolQr(antrian),
+        const SizedBox(height: 12),
+        _buildInfoOtomatis(),
+      ],
+    );
+  }
+
+  // Kartu paling atas: nomor antrian gede, badge status, & 3 statistik.
+  Widget _buildStatusUtamaCard(AntrianDonor antrian) {
+    final info = _statusAntrianInfo(antrian.status);
+    final progress = _progresAntrian(antrian.status);
 
     return Container(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: urgent ? AppColors.primary : AppColors.inputBorder,
-          width: urgent ? 1.5 : 1,
-        ),
+        border: Border.all(color: AppColors.inputBorder),
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-            color: AppColors.cardDark,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: info.$2.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(999),
+            ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: Text(
-                    antrian.nomorAntrian,
-                    style: AppText.headline.copyWith(
-                      color: Colors.white,
-                      fontSize: 24,
-                    ),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: info.$2,
+                    shape: BoxShape.circle,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusInfo.$2,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    statusInfo.$1,
-                    style: AppText.chip.copyWith(color: Colors.white),
-                  ),
+                const SizedBox(width: 6),
+                Text(
+                  info.$1,
+                  style: AppText.chip.copyWith(color: info.$2, fontSize: 11.5),
                 ),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(18),
+          const SizedBox(height: 10),
+          Text(info.$3, style: AppText.helper.copyWith(fontSize: 12)),
+          const SizedBox(height: 6),
+          Text(
+            antrian.nomorAntrian,
+            style: AppText.headline.copyWith(fontSize: 40, letterSpacing: 1),
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 5,
+              backgroundColor: AppColors.tabInactiveBg,
+              valueColor: AlwaysStoppedAnimation(AppColors.primary),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatChipTerang('Nomor Anda', antrian.nomorAntrian),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatChipTerang(
+                  'Di depan',
+                  '${antrian.jumlahDidepan} orang',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatChipTerang(
+                  'Estimasi',
+                  '${antrian.estimasiMenit} mnt',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatChipTerang(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: AppColors.tabInactiveBg,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: AppText.helper.copyWith(fontSize: 10),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: AppText.inputText.copyWith(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Kartu tahapan: 1) e-ticket, 2) menunggu, 3) dipanggil,
+  // 4) check-in & proses, 5) selesai.
+  static const _tahapanAntrian = [
+    'E-ticket diterbitkan',
+    'Menunggu dalam antrian',
+    'Nomor Anda dipanggil',
+    'Check-in & proses donor',
+    'Selesai · sertifikat terbit',
+  ];
+
+  Widget _buildTimelineCard(AntrianDonor antrian) {
+    final langkahAktif = _langkahAktifAntrian(antrian.status);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < _tahapanAntrian.length; i++)
+            _buildTahapanRow(
+              nomor: i + 1,
+              label: _tahapanAntrian[i],
+              selesai: i + 1 < langkahAktif,
+              aktif: i + 1 == langkahAktif,
+              terakhir: i == _tahapanAntrian.length - 1,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTahapanRow({
+    required int nomor,
+    required String label,
+    required bool selesai,
+    required bool aktif,
+    required bool terakhir,
+  }) {
+    final lingkaranBg = aktif
+        ? AppColors.primary
+        : selesai
+        ? AppColors.primary.withValues(alpha: 0.12)
+        : AppColors.tabInactiveBg;
+    final lingkaranFg = aktif
+        ? Colors.white
+        : selesai
+        ? AppColors.primary
+        : AppColors.neutralMuted;
+    final teksStyle = aktif
+        ? AppText.inputText.copyWith(
+            fontWeight: FontWeight.w700,
+            fontSize: 13.5,
+          )
+        : selesai
+        ? AppText.inputText.copyWith(fontSize: 13.5)
+        : AppText.inputText.copyWith(
+            color: AppColors.neutralMuted,
+            fontSize: 13.5,
+          );
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: lingkaranBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '$nomor',
+                  style: AppText.chip.copyWith(
+                    color: lingkaranFg,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+              if (!terakhir)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    margin: const EdgeInsets.symmetric(vertical: 2),
+                    color: AppColors.inputBorder,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: terakhir ? 0 : 18, top: 2),
+              child: Text(label, style: teksStyle),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTombolQr(AntrianDonor antrian) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: OutlinedButton.icon(
+        onPressed: () => _tampilkanQrCheckin(antrian),
+        icon: const Icon(Icons.qr_code_2, size: 18),
+        label: const Text('Tampilkan QR untuk check-in'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.textPrimary,
+          side: const BorderSide(color: AppColors.inputBorder),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Notifikasi device ditawarkan sekali di ETiketScreen begitu pendonor
+  // selesai mendaftar (bukan di sini) -- lihat showNotifikasiPermissionDialog().
+  // Banner ini cuma nyerminin status izinnya: kalau sudah "Ya", notifikasi
+  // dianggap tetap aktif selama antrian pendonor masih berjalan.
+  Widget _buildInfoOtomatis() {
+    final notifikasiAktif = context.watch<NotifikasiProvider>().notifikasiAktif;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.tabInactiveBg,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            notifikasiAktif
+                ? Icons.notifications_active_outlined
+                : Icons.access_time_rounded,
+            size: 16,
+            color: notifikasiAktif ? AppColors.success : AppColors.neutralMuted,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _infoRowSimpel(
-                  Icons.calendar_today_outlined,
-                  '${_formatTanggal(antrian.jadwal.tanggal)} · '
-                  '${antrian.jadwal.slotWaktu} WIB',
-                ),
-                const SizedBox(height: 10),
-                _infoRowSimpel(
-                  Icons.location_on_outlined,
-                  '${antrian.jadwal.lokasi.namaLokasi}\n'
-                  '${antrian.jadwal.lokasi.alamat}',
-                ),
-                if (urgent && antrian.batasWaktuCheckin != null) ...[
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFBEAEA),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          Icons.timer_outlined,
-                          size: 16,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Segera menuju loket! Check-in sebelum '
-                            '${_formatJam(antrian.batasWaktuCheckin!)} WIB, '
-                            'kalau tidak nomor akan hangus.',
-                            style: AppText.helper.copyWith(
-                              color: AppColors.primary,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
+                if (notifikasiAktif) ...[
+                  Text(
+                    'Notifikasi aktif',
+                    style: AppText.helper.copyWith(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(height: 2),
                 ],
+                Text(
+                  'Posisi antrian bergerak otomatis. Anda akan menerima '
+                  'notifikasi ketika tersisa 2 pendonor di depan Anda.',
+                  style: AppText.helper,
+                ),
               ],
             ),
           ),
@@ -403,20 +514,103 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  (String, Color) _statusAntrianInfo(StatusAntrian status) {
+  void _tampilkanQrCheckin(AntrianDonor antrian) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.inputBorder,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                antrian.nomorAntrian,
+                style: AppText.headline.copyWith(fontSize: 24),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Tunjukkan QR ini ke petugas loket saat check-in',
+                style: AppText.helper,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              // GAP: ganti Container ini dengan widget QR asli (paket
+              // qr_flutter, belum ada di pubspec.yaml) begitu backend
+              // ngasih kode unik buat di-scan petugas loket.
+              Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  color: AppColors.tabInactiveBg,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(
+                  Icons.qr_code_2,
+                  size: 90,
+                  color: AppColors.neutralMuted,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                antrian.qrCode,
+                style: AppText.helper.copyWith(fontSize: 10.5),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Fraksi progres bar (0.0 - 1.0) berdasarkan tahapan aktif dari 5 langkah.
+  double _progresAntrian(StatusAntrian status) =>
+      _langkahAktifAntrian(status) / _tahapanAntrian.length;
+
+  // Tahapan (1-5) yang sedang berjalan buat status antrian tertentu.
+  int _langkahAktifAntrian(StatusAntrian status) {
     switch (status) {
       case StatusAntrian.menunggu:
-        return ('Menunggu', AppColors.neutralMuted);
+        return 2;
       case StatusAntrian.dipanggil:
-        return ('Dipanggil', AppColors.primary);
+        return 3;
       case StatusAntrian.sedangDiproses:
-        return ('Sedang diproses', AppColors.success);
+        return 4;
       case StatusAntrian.selesai:
-        return ('Selesai', AppColors.success);
+        return 5;
       case StatusAntrian.tidakHadir:
-        return ('Tidak hadir', AppColors.neutralMuted);
       case StatusAntrian.dibatalkan:
-        return ('Dibatalkan', AppColors.neutralMuted);
+        return 1;
+    }
+  }
+
+  // (label badge, warna, caption "Sedang ...")
+  (String, Color, String) _statusAntrianInfo(StatusAntrian status) {
+    switch (status) {
+      case StatusAntrian.menunggu:
+        return ('Sedang mengantre', AppColors.neutralMuted, 'Sedang dilayani');
+      case StatusAntrian.dipanggil:
+        return ('Giliran Anda sekarang', AppColors.primary, 'Sedang dilayani');
+      case StatusAntrian.sedangDiproses:
+        return ('Sedang diproses', AppColors.success, 'Sedang dilayani');
+      case StatusAntrian.selesai:
+        return ('Selesai', AppColors.success, 'Terima kasih sudah donor!');
+      case StatusAntrian.tidakHadir:
+        return ('Tidak hadir', AppColors.neutralMuted, 'Nomor sudah hangus');
+      case StatusAntrian.dibatalkan:
+        return ('Dibatalkan', AppColors.neutralMuted, 'Antrian dibatalkan');
     }
   }
 

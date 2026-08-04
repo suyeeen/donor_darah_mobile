@@ -6,14 +6,22 @@ enum NotifikasiStatusFetch { idle, loading, loaded, error }
 
 class NotifikasiProvider extends ChangeNotifier {
   static const _keySudahTanyaIzin = 'notif_sudah_tanya_izin';
+  static const _keyNotifikasiAktif = 'notif_aktif';
 
   NotifikasiStatusFetch status = NotifikasiStatusFetch.idle;
   List<NotifikasiItem> daftarNotifikasi = [];
   String? errorMessage;
 
   /// Dipakai buat nampilin dialog "Aktifkan Notifikasi pada Device" cuma
-  /// sekali di percobaan pertama buka Home.
+  /// sekali, tepat setelah pendonor selesai mendaftar/ambil nomor antrian
+  /// (bukan lagi di percobaan pertama buka Home).
   bool sudahTanyaIzinDevice = false;
+
+  /// True kalau pendonor pilih "Ya" di dialog izin notifikasi. Selama
+  /// antrian pendonor masih berjalan (belum selesai/dibatalkan),
+  /// notifikasi ini tetap aktif buat ngasih kabar realtime (nomor
+  /// dipanggil, tersisa sekian orang di depan, dst).
+  bool notifikasiAktif = false;
 
   // TODO: sambungin ke endpoint backend notifikasi (belum tersedia),
   // sementara list-nya kosong biar UI empty state kepakai dulu.
@@ -41,6 +49,7 @@ class NotifikasiProvider extends ChangeNotifier {
   Future<void> cekSudahTanyaIzinDevice() async {
     final prefs = await SharedPreferences.getInstance();
     sudahTanyaIzinDevice = prefs.getBool(_keySudahTanyaIzin) ?? false;
+    notifikasiAktif = prefs.getBool(_keyNotifikasiAktif) ?? false;
     notifyListeners();
   }
 
@@ -48,6 +57,16 @@ class NotifikasiProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keySudahTanyaIzin, true);
     sudahTanyaIzinDevice = true;
+    notifyListeners();
+  }
+
+  /// Dipanggil begitu pendonor menyetujui dialog izin notifikasi. Status
+  /// ini yang dipakai AntrianStatusScreen buat nunjukin badge "Notifikasi
+  /// aktif" selama antrian pendonor masih berjalan.
+  Future<void> aktifkanNotifikasi() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyNotifikasiAktif, true);
+    notifikasiAktif = true;
     notifyListeners();
   }
 }
