@@ -18,6 +18,7 @@ import 'notifikasi_screen.dart';
 import 'profil_screen.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'sertifikat_screen.dart';
+import 'tes_notifikasi_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   // Tab yang aktif pas HomeScreen pertama kali dibuka. Default 0 (Jadwal)
@@ -867,6 +868,18 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
           ),
+          const SizedBox(height: 12),
+          _buildMenuGroup([
+            _MenuItemData(
+              icon: Icons.bug_report_outlined,
+              label: 'Tes Notifikasi Push',
+              subtitle: 'Cek token FCM & tes notifikasi masuk',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TesNotifikasiScreen()),
+              ),
+            ),
+          ]),
           const SizedBox(height: 20),
           _sectionLabel('Lainnya'),
           const SizedBox(height: 10),
