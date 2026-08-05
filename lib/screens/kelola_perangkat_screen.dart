@@ -1,15 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-/// FR-1.4 "Manajemen Sesi & Perangkat" (prioritas Rendah di FRD): pendonor
-/// bisa lihat perangkat yang lagi login & logout dari perangkat lain demi
-/// keamanan akun.
-///
-/// GAP: masih statis/mock, dibuat mengikuti kolom tabel `sesi_pendonor`
-/// (device_info, ip_address, last_active_at, status) di db_antrian_donor.sql.
-/// Belum ada endpoint GET /pendonor/sesi & DELETE /pendonor/sesi/{id} --
-/// besok sambungkan lewat SesiService, ganti _daftarSesiMock jadi hasil
-/// fetch, dan aksi "Keluar" di bawah manggil endpoint delete-nya.
 class KelolaPerangkatScreen extends StatefulWidget {
   const KelolaPerangkatScreen({super.key});
 

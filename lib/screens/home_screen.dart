@@ -16,6 +16,8 @@ import 'detail_jadwal_screen.dart';
 import 'kelola_perangkat_screen.dart';
 import 'notifikasi_screen.dart';
 import 'profil_screen.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'sertifikat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -552,20 +554,31 @@ class _HomeScreenState extends State<HomeScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              // GAP: ganti Container ini dengan widget QR asli (paket
-              // qr_flutter, belum ada di pubspec.yaml) begitu backend
-              // ngasih kode unik buat di-scan petugas loket.
+              // Kode QR asli dari antrian.qrCode. GAP: nilai qrCode
+              // sekarang cuma string dummy dari AntrianService/
+              // ETiketScreen -- begitu backend ngasih kode unik hasil
+              // INSERT ke tabel antrian, otomatis kepakai di sini tanpa
+              // ubah widget-nya.
               Container(
-                width: 200,
-                height: 200,
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.tabInactiveBg,
+                  color: Colors.white,
+                  border: Border.all(color: AppColors.inputBorder),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(
-                  Icons.qr_code_2,
-                  size: 90,
-                  color: AppColors.neutralMuted,
+                child: QrImageView(
+                  data: antrian.qrCode,
+                  version: QrVersions.auto,
+                  size: 200,
+                  backgroundColor: Colors.white,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square,
+                    color: AppColors.textPrimary,
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -757,17 +770,12 @@ class _HomeScreenState extends State<HomeScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () {
-                  // TODO: implementasi unduh sertifikat donor (FR-8.2),
-                  // butuh endpoint backend buat generate PDF sertifikat.
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Fitur sertifikat belum tersambung ke backend',
-                      ),
-                    ),
-                  );
-                },
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SertifikatScreen(riwayat: riwayat),
+                  ),
+                ),
                 icon: const Icon(Icons.workspace_premium_outlined, size: 16),
                 label: const Text('Lihat Sertifikat'),
                 style: OutlinedButton.styleFrom(
@@ -827,7 +835,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             _MenuItemData(
               icon: Icons.devices_outlined,
-              label: 'Kelola perangkat  masih perbaikan ',
+              label: 'Kelola perangkat ',
               subtitle: 'Lihat & keluar dari sesi lain',
               onTap: () => Navigator.push(
                 context,

@@ -8,6 +8,7 @@ import '../providers/notifikasi_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/notifikasi_permission_dialog.dart';
 import 'pilih_slot_waktu_screen.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class ETiketScreen extends StatefulWidget {
   final JadwalDonor jadwal;
@@ -115,20 +116,32 @@ class _ETiketScreenState extends State<ETiketScreen> {
           Padding(
             padding: const EdgeInsets.all(24),
             child: Center(
-              // GAP: ganti Container ini dengan widget QR asli (paket
-              // qr_flutter, belum ada di pubspec.yaml) begitu backend
-              // ngasih kode unik buat di-scan petugas loket.
+              // Kode QR asli, di-generate langsung di device dari string
+              // qrCode. GAP: string-nya sendiri masih di-generate random
+              // di client (lihat _nomorUrutAntrian) -- begitu backend
+              // ngasih kode unik hasil INSERT ke tabel antrian, ganti
+              // sumber data QR-nya ke situ, widget QR ini gak perlu
+              // berubah sama sekali.
               child: Container(
-                width: 180,
-                height: 180,
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.tabInactiveBg,
+                  color: Colors.white,
+                  border: Border.all(color: AppColors.inputBorder),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.qr_code_2,
-                  size: 80,
-                  color: AppColors.neutralMuted,
+                child: QrImageView(
+                  data: 'QR-DEMO-$_nomorAntrian',
+                  version: QrVersions.auto,
+                  size: 180,
+                  backgroundColor: Colors.white,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square,
+                    color: AppColors.textPrimary,
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ),

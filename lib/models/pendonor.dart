@@ -45,8 +45,6 @@ class Pendonor {
     );
   }
 
-  /// Dipakai ProfilScreen buat bikin salinan Pendonor dengan field yang
-  /// diedit user. UI-only untuk sekarang -- lihat AuthProvider.simpanProfil().
   Pendonor copyWith({
     String? nama,
     DateTime? tanggalLahir,

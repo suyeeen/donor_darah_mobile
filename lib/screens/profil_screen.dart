@@ -4,12 +4,6 @@ import '../models/pendonor.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 
-/// Screen "Profil Saya" -- lihat & lengkapi data diri pendonor (FR-2.1:
-/// golongan darah, berat badan, tanggal lahir, alamat, riwayat kesehatan
-/// dasar). NIK & nomor telepon sengaja READ-ONLY di sini karena keduanya
-/// jadi identitas verifikasi akun (NIK terhubung rekam PMI, no. telepon
-/// dipakai OTP login) -- perubahan atas 2 field itu seharusnya lewat alur
-/// verifikasi terpisah (mis. ubah nomor perlu OTP baru), bukan form biasa.
 class ProfilScreen extends StatefulWidget {
   const ProfilScreen({super.key});
 
