@@ -71,6 +71,7 @@ class _SertifikatScreenState extends State<SertifikatScreen> {
     final namaTampil = (pendonor?.nama.isNotEmpty ?? false)
         ? pendonor!.nama
         : 'Pendonor';
+    final golonganDarah = pendonor?.golonganDarah;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -86,7 +87,7 @@ class _SertifikatScreenState extends State<SertifikatScreen> {
                 child: SingleChildScrollView(
                   child: RepaintBoundary(
                     key: _sertifikatKey,
-                    child: _buildKartuSertifikat(namaTampil),
+                    child: _buildKartuSertifikat(namaTampil, golonganDarah),
                   ),
                 ),
               ),
@@ -162,7 +163,7 @@ class _SertifikatScreenState extends State<SertifikatScreen> {
     );
   }
 
-  Widget _buildKartuSertifikat(String namaTampil) {
+  Widget _buildKartuSertifikat(String namaTampil, String? golonganDarah) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFFDFBFA),
@@ -252,9 +253,10 @@ class _SertifikatScreenState extends State<SertifikatScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      // TODO: ambil dari Pendonor.golonganDarah asli,
-                      // bukan hardcode.
-                      'O+',
+                      // Diambil dari Pendonor.golonganDarah (AuthProvider).
+                      // Nullable karena belum tentu udah diisi lewat form
+                      // "Lengkapi Profil" -- fallback ke '-' kalau kosong.
+                      golonganDarah ?? '-',
                       style: AppText.headline.copyWith(
                         color: AppColors.primary,
                         fontSize: 15,

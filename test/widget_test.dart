@@ -1,9 +1,8 @@
-// This is a basic Flutter widget test.
+// Smoke test dasar buat AmpiraApp.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// Karena app ini pakai Provider (butuh sesi/async lookup) sejak SplashScreen
+// tampil, test cuma pastikan app bisa di-build tanpa exception dan
+// SplashScreen (entry point pertama) muncul di frame awal.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,20 +10,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:antrian_donor_darah/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('AmpiraApp bisa di-build dan menampilkan SplashScreen', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const AmpiraApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Belum panggil pump() lanjutan supaya gak nge-trigger
+    // WidgetsBinding.instance.addPostFrameCallback -> auth.cekSesiTersimpan()
+    // (yang butuh SharedPreferences/plugin async, gak stabil di unit test
+    // biasa tanpa mocking). Cukup pastikan splash tampil dulu.
+    expect(find.text('Ampira'), findsOneWidget);
+    expect(find.byIcon(Icons.bloodtype), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 }

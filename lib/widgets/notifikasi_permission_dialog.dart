@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/notifikasi_provider.dart';
+import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
 
 /// Dialog "Aktifkan Notifikasi pada Device".
@@ -82,16 +83,27 @@ Future<void> showNotifikasiPermissionDialog(BuildContext context) async {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: sambungin ke request izin notifikasi device
-                      // asli (mis. firebase_messaging / permission_handler)
-                      // begitu paket push notification dipasang. Setelah
-                      // izin didapat, notifikasi tetap aktif otomatis
-                      // selama antrian pendonor berjalan (lihat
-                      // AntrianStatusScreen).
+                    onPressed: () async {
+                      final diizinkan = await PushNotificationService.instance
+                          .mintaIzin();
+
                       notifProvider.tandaiSudahTanyaIzinDevice();
-                      notifProvider.aktifkanNotifikasi();
-                      Navigator.pop(dialogContext);
+
+                      if (diizinkan) {
+                        notifProvider.aktifkanNotifikasi();
+
+                        // Ambil token sekarang. Backend belum siap terima
+                        // ini, jadi sementara cuma di-log -- begitu
+                        // endpoint POST /device-token ada, kirim `token`
+                        // ke situ persis di titik ini.
+                        final token = await PushNotificationService.instance
+                            .ambilToken();
+                        debugPrint('FCM token pendonor: $token');
+                      }
+
+                      if (dialogContext.mounted) {
+                        Navigator.pop(dialogContext);
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.success,

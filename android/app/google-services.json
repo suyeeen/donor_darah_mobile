@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "515939083237",
+    "project_id": "antrian-donor-darah",
+    "storage_bucket": "antrian-donor-darah.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:515939083237:android:0ecbf22495af5c46ba050c",
+        "android_client_info": {
+          "package_name": "com.example.antrian_donor_darah"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDHyb-cPjHRffTHhyZerRkZ6-__7LCcOqA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

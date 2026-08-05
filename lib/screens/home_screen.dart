@@ -20,14 +20,20 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'sertifikat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  // Tab yang aktif pas HomeScreen pertama kali dibuka. Default 0 (Jadwal)
+  // buat alur normal habis login -- dikasih 1 (Antrian) pas dibuka dari
+  // PushNotificationService.navigatorKey.pushNamed('/antrian').
+  final int initialTabIndex;
+
+  const HomeScreen({super.key, this.initialTabIndex = 0});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _navIndex = 0; // 0 Jadwal, 1 Antrian, 2 Riwayat, 3 Pengaturan
+  late int _navIndex =
+      widget.initialTabIndex; // 0 Jadwal, 1 Antrian, 2 Riwayat, 3 Pengaturan
   String _filterLokasi = 'Semua';
 
   static const _filterOptions = ['Semua', 'Bandung', 'Jember'];

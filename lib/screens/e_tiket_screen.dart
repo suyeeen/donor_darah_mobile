@@ -1,6 +1,11 @@
+import 'dart:io';
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/antrian_donor.dart';
 import '../models/jadwal_donor.dart';
 import '../providers/antrian_provider.dart';
@@ -24,6 +29,9 @@ class _ETiketScreenState extends State<ETiketScreen> {
   JadwalDonor get jadwal => widget.jadwal;
   SlotWaktu get slot => widget.slot;
 
+  final GlobalKey _tiketKey = GlobalKey();
+  bool _sedangUnduh = false;
+
   // GAP: nomor antrian seharusnya datang dari response API "ambil nomor
   // antrian" (FR-4.2), bukan dibikin di client. Mock ini cuma buat preview UI.
   int get _nomorUrutAntrian =>
@@ -38,9 +46,6 @@ class _ETiketScreenState extends State<ETiketScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
 
-      // Daftarin antrian yang baru diambil ini ke AntrianProvider, biar
-      // langsung muncul di tab "Antrian" pas kembali ke Home -- sebelumnya
-      // e-tiket cuma tampil di layar ini doang lalu hilang begitu ditutup.
       final jumlahDidepan = slot.pendaftar;
       context.read<AntrianProvider>().tambahAntrianBaru(
         AntrianDonor(
@@ -51,23 +56,47 @@ class _ETiketScreenState extends State<ETiketScreen> {
           qrCode: 'QR-DEMO-$_nomorAntrian',
           batasWaktuCheckin: null,
           jumlahDidepan: jumlahDidepan,
-          // ASUMSI: rata-rata 8 menit per pendonor (skrining + proses
-          // donor). Gak ada acuan resmi dari PMI/FRD -- sesuaikan kalau
-          // ada standar waktu proses yang lebih akurat.
           estimasiMenit: jumlahDidepan * 8,
         ),
       );
 
-      // Pendonor baru aja SELESAI MENDAFTAR (dapat nomor antrian) -- ini
-      // titik fallback buat nawarin notifikasi device (trigger utamanya
-      // sekarang di AuthScreen abis registrasi). Gak akan muncul dobel,
-      // karena dicek lewat flag sudahTanyaIzinDevice yang sama.
       final notifProvider = context.read<NotifikasiProvider>();
       await notifProvider.cekSudahTanyaIzinDevice();
       if (!notifProvider.sudahTanyaIzinDevice && mounted) {
         showNotifikasiPermissionDialog(context);
       }
     });
+  }
+
+  Future<void> _unduhTiket() async {
+    if (_sedangUnduh) return;
+    setState(() => _sedangUnduh = true);
+
+    try {
+      final boundary =
+          _tiketKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) return;
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
+
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/e-tiket-$_nomorAntrian.png');
+      await file.writeAsBytes(byteData.buffer.asUint8List());
+
+      await Share.shareXFiles([
+        XFile(file.path),
+      ], text: 'E-tiket antrian donor darah $_nomorAntrian');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal menyimpan e-tiket: $e')));
+    } finally {
+      if (mounted) setState(() => _sedangUnduh = false);
+    }
   }
 
   @override
@@ -79,7 +108,14 @@ class _ETiketScreenState extends State<ETiketScreen> {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              Expanded(child: SingleChildScrollView(child: _buildTiketCard())),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: RepaintBoundary(
+                    key: _tiketKey,
+                    child: _buildTiketCard(),
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
               _buildTombolUnduh(context),
               const SizedBox(height: 10),
@@ -116,12 +152,6 @@ class _ETiketScreenState extends State<ETiketScreen> {
           Padding(
             padding: const EdgeInsets.all(24),
             child: Center(
-              // Kode QR asli, di-generate langsung di device dari string
-              // qrCode. GAP: string-nya sendiri masih di-generate random
-              // di client (lihat _nomorUrutAntrian) -- begitu backend
-              // ngasih kode unik hasil INSERT ke tabel antrian, ganti
-              // sumber data QR-nya ke situ, widget QR ini gak perlu
-              // berubah sama sekali.
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -237,22 +267,23 @@ class _ETiketScreenState extends State<ETiketScreen> {
       width: double.infinity,
       height: 48,
       child: ElevatedButton.icon(
-        onPressed: () {
-          // TODO: implementasi unduh/simpan e-tiket, misal pakai package
-          // screenshot atau share_plus.
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Fitur unduh belum tersambung ke backend'),
-            ),
-          );
-        },
-        icon: const Icon(
-          Icons.download_outlined,
-          color: Colors.white,
-          size: 18,
-        ),
+        onPressed: _sedangUnduh ? null : _unduhTiket,
+        icon: _sedangUnduh
+            ? const SizedBox(
+                height: 16,
+                width: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(
+                Icons.download_outlined,
+                color: Colors.white,
+                size: 18,
+              ),
         label: Text(
-          'Unduh Nomor Antrian',
+          _sedangUnduh ? 'Menyimpan...' : 'Unduh Nomor Antrian',
           style: AppText.button.copyWith(color: Colors.white),
         ),
         style: ElevatedButton.styleFrom(
