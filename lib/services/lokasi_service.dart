@@ -19,7 +19,7 @@ class LokasiService {
   /// [jenis] opsional: 'tetap' atau 'mobile_unit'. Kirim null buat ambil
   /// semua jenis lokasi sekaligus.
   Future<List<LokasiDonor>> getPeta({String? jenis}) async {
-    final query = <String, String>{if (jenis != null) 'jenis': jenis};
+    final query = <String, String>{'jenis': ?jenis};
 
     final data = await _client.get(ApiConfig.lokasiPeta, query: query);
     final list = data['_list'] as List? ?? [];

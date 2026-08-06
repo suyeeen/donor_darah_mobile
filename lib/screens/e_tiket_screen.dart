@@ -1,108 +1,11 @@
-import 'dart:io';
-import 'dart:math';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../models/antrian_donor.dart';
-import '../models/jadwal_donor.dart';
-import '../providers/antrian_provider.dart';
-import '../providers/notifikasi_provider.dart';
 import '../theme/app_theme.dart';
-import '../widgets/notifikasi_permission_dialog.dart';
-import 'pilih_slot_waktu_screen.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
-class ETiketScreen extends StatefulWidget {
-  final JadwalDonor jadwal;
-  final SlotWaktu slot;
+class ETiketScreen extends StatelessWidget {
+  final AntrianDonor antrian;
 
-  const ETiketScreen({super.key, required this.jadwal, required this.slot});
-
-  @override
-  State<ETiketScreen> createState() => _ETiketScreenState();
-}
-
-class _ETiketScreenState extends State<ETiketScreen> {
-  JadwalDonor get jadwal => widget.jadwal;
-  SlotWaktu get slot => widget.slot;
-
-  final GlobalKey _tiketKey = GlobalKey();
-  bool _sedangUnduh = false;
-
-  // GAP: nomor antrian seharusnya datang dari response API "ambil nomor
-  // antrian" (FR-4.2), bukan dibikin di client. Mock ini cuma buat preview UI.
-  int get _nomorUrutAntrian => slot.pendaftar + 1;
-
-  String get _nomorAntrian =>
-      'A-${_nomorUrutAntrian.toString().padLeft(3, '0')}';
-
-  String get _qrCodeHash {
-    final acak = Random(jadwal.idJadwal + slot.jamMulai.hashCode);
-    const hex = '0123456789abcdef';
-    return List.generate(32, (_) => hex[acak.nextInt(16)]).join();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-
-      final jumlahDidepan = slot.pendaftar;
-      context.read<AntrianProvider>().tambahAntrianBaru(
-        AntrianDonor(
-          idAntrian: DateTime.now().millisecondsSinceEpoch,
-          jadwal: jadwal,
-          nomorUrut: _nomorUrutAntrian,
-          status: StatusAntrian.menunggu,
-          qrCode: _qrCodeHash,
-          batasWaktuCheckin: null,
-          jumlahDidepan: jumlahDidepan,
-          estimasiMenit: jumlahDidepan * 8,
-        ),
-      );
-
-      final notifProvider = context.read<NotifikasiProvider>();
-      await notifProvider.cekSudahTanyaIzinDevice();
-      if (!notifProvider.sudahTanyaIzinDevice && mounted) {
-        showNotifikasiPermissionDialog(context);
-      }
-    });
-  }
-
-  Future<void> _unduhTiket() async {
-    if (_sedangUnduh) return;
-    setState(() => _sedangUnduh = true);
-
-    try {
-      final boundary =
-          _tiketKey.currentContext?.findRenderObject()
-              as RenderRepaintBoundary?;
-      if (boundary == null) return;
-
-      final image = await boundary.toImage(pixelRatio: 3.0);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) return;
-
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/e-tiket-$_nomorAntrian.png');
-      await file.writeAsBytes(byteData.buffer.asUint8List());
-
-      await Share.shareXFiles([
-        XFile(file.path),
-      ], text: 'E-tiket antrian donor darah $_nomorAntrian');
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Gagal menyimpan e-tiket: $e')));
-    } finally {
-      if (mounted) setState(() => _sedangUnduh = false);
-    }
-  }
+  const ETiketScreen({super.key, required this.antrian});
 
   @override
   Widget build(BuildContext context) {
@@ -113,17 +16,8 @@ class _ETiketScreenState extends State<ETiketScreen> {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: RepaintBoundary(
-                    key: _tiketKey,
-                    child: _buildTiketCard(),
-                  ),
-                ),
-              ),
+              Expanded(child: SingleChildScrollView(child: _buildTiketCard())),
               const SizedBox(height: 16),
-              _buildTombolUnduh(context),
-              const SizedBox(height: 10),
               _buildTombolKembali(context),
             ],
           ),
@@ -133,6 +27,8 @@ class _ETiketScreenState extends State<ETiketScreen> {
   }
 
   Widget _buildTiketCard() {
+    final jadwal = antrian.jadwal;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -147,7 +43,7 @@ class _ETiketScreenState extends State<ETiketScreen> {
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
             color: AppColors.cardDark,
             child: Text(
-              _nomorAntrian,
+              antrian.nomorAntrian,
               style: AppText.headline.copyWith(
                 color: Colors.white,
                 fontSize: 32,
@@ -157,6 +53,12 @@ class _ETiketScreenState extends State<ETiketScreen> {
           Padding(
             padding: const EdgeInsets.all(24),
             child: Center(
+              // GAP: qr_code dari backend itu STRING HASH, bukan payload
+              // gambar. Backend belum punya endpoint buat render-nya jadi
+              // gambar QR (mis. via qrserver.com atau bikin sendiri).
+              // Sementara pakai qr_flutter buat generate visual dari
+              // string hash ini -- ganti kalau backend nanti nyediain
+              // format khusus (mis. data URI base64).
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -164,19 +66,22 @@ class _ETiketScreenState extends State<ETiketScreen> {
                   border: Border.all(color: AppColors.inputBorder),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: QrImageView(
-                  data: 'QR-DEMO-$_nomorAntrian',
-                  version: QrVersions.auto,
-                  size: 180,
-                  backgroundColor: Colors.white,
-                  eyeStyle: const QrEyeStyle(
-                    eyeShape: QrEyeShape.square,
-                    color: AppColors.textPrimary,
-                  ),
-                  dataModuleStyle: const QrDataModuleStyle(
-                    dataModuleShape: QrDataModuleShape.square,
-                    color: AppColors.textPrimary,
-                  ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.qr_code_2,
+                      size: 140,
+                      color: AppColors.textPrimary,
+                    ),
+                    const SizedBox(height: 8),
+                    SelectableText(
+                      antrian.qrCode,
+                      style: AppText.helper.copyWith(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -188,22 +93,64 @@ class _ETiketScreenState extends State<ETiketScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _infoRow(
-                  Icons.calendar_today_outlined,
-                  'Jadwal',
-                  '${_formatTanggal(jadwal.tanggal)} · ${slot.label} WIB',
+                  Icons.info_outline,
+                  'Status',
+                  _labelStatus(antrian.status),
                 ),
-                const SizedBox(height: 14),
-                _infoRow(
-                  Icons.location_on_outlined,
-                  'Lokasi',
-                  '${jadwal.lokasi.namaLokasi}\n${jadwal.lokasi.alamat}',
-                ),
+                if (jadwal != null) ...[
+                  const SizedBox(height: 14),
+                  _infoRow(
+                    Icons.calendar_today_outlined,
+                    'Jadwal',
+                    '${_formatTanggal(jadwal.tanggal)} · ${jadwal.slotWaktu} WIB',
+                  ),
+                  const SizedBox(height: 14),
+                  _infoRow(
+                    Icons.location_on_outlined,
+                    'Lokasi',
+                    '${jadwal.namaLokasi ?? '-'}\n${jadwal.alamat ?? ''}',
+                  ),
+                ],
+                if (antrian.batasWaktuCheckin != null) ...[
+                  const SizedBox(height: 14),
+                  _infoRow(
+                    Icons.timer_outlined,
+                    'Batas check-in',
+                    _formatWaktu(antrian.batasWaktuCheckin!),
+                  ),
+                ],
+                if (antrian.posisi != null) ...[
+                  const SizedBox(height: 14),
+                  _infoRow(
+                    Icons.people_outline,
+                    'Posisi antrian',
+                    '${antrian.posisi!.jumlahDiDepan} orang di depan · '
+                        'estimasi ${antrian.posisi!.estimasiMenit} menit',
+                  ),
+                ],
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _labelStatus(StatusAntrian status) {
+    switch (status) {
+      case StatusAntrian.menunggu:
+        return 'Menunggu';
+      case StatusAntrian.dipanggil:
+        return 'Dipanggil';
+      case StatusAntrian.sedangDiproses:
+        return 'Sedang diproses';
+      case StatusAntrian.selesai:
+        return 'Selesai';
+      case StatusAntrian.tidakHadir:
+        return 'Tidak hadir (hangus)';
+      case StatusAntrian.dibatalkan:
+        return 'Dibatalkan';
+    }
   }
 
   Widget _infoRow(IconData icon, String label, String value) {
@@ -267,39 +214,10 @@ class _ETiketScreenState extends State<ETiketScreen> {
         '${bulan[tanggal.month - 1]} ${tanggal.year}';
   }
 
-  Widget _buildTombolUnduh(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton.icon(
-        onPressed: _sedangUnduh ? null : _unduhTiket,
-        icon: _sedangUnduh
-            ? const SizedBox(
-                height: 16,
-                width: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Icon(
-                Icons.download_outlined,
-                color: Colors.white,
-                size: 18,
-              ),
-        label: Text(
-          _sedangUnduh ? 'Menyimpan...' : 'Unduh Nomor Antrian',
-          style: AppText.button.copyWith(color: Colors.white),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: 0,
-        ),
-      ),
-    );
+  String _formatWaktu(DateTime waktu) {
+    final j = waktu.hour.toString().padLeft(2, '0');
+    final m = waktu.minute.toString().padLeft(2, '0');
+    return '${_formatTanggal(waktu)}, $j:$m WIB';
   }
 
   Widget _buildTombolKembali(BuildContext context) {

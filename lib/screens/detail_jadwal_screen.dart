@@ -1,14 +1,123 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
 import '../models/jadwal_donor.dart';
+import '../providers/antrian_provider.dart';
+import '../providers/auth_provider.dart';
+import '../services/api_exception.dart';
 import '../theme/app_theme.dart';
-import 'pilih_slot_waktu_screen.dart';
+import 'e_tiket_screen.dart';
+import 'hasil_kuesioner_screen.dart';
 
-class DetailJadwalScreen extends StatelessWidget {
+class DetailJadwalScreen extends StatefulWidget {
   final JadwalDonor jadwal;
 
   const DetailJadwalScreen({super.key, required this.jadwal});
+
+  @override
+  State<DetailJadwalScreen> createState() => _DetailJadwalScreenState();
+}
+
+class _DetailJadwalScreenState extends State<DetailJadwalScreen> {
+  bool _sedangProses = false;
+
+  JadwalDonor get jadwal => widget.jadwal;
+
+  /// FR-4.1: langsung POST /antrian -- TIDAK ada lagi langkah "pilih slot
+  /// waktu" (backend cuma punya 1 slot_waktu tetap per jadwal_donor, jadi
+  /// PilihSlotWaktuScreen yang lama sudah tidak relevan buat alur ini).
+  Future<void> _ambilNomorAntrian() async {
+    setState(() => _sedangProses = true);
+
+    final antrianProvider = context.read<AntrianProvider>();
+
+    try {
+      final antrian = await antrianProvider.ambilNomor(
+        idJadwal: jadwal.idJadwal,
+      );
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ETiketScreen(antrian: antrian)),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _sedangProses = false);
+
+      // 422 spesifik: kuesioner kesehatan (Modul 2) belum pernah diisi
+      // sama sekali -- backend nolak sebelum itu kelar (lihat
+      // Antrian::ambil() di backend).
+      if (e.message.toLowerCase().contains('kuesioner')) {
+        _tampilkanDialogKuesionerBelumDiisi();
+        return;
+      }
+
+      // 409: sudah punya antrian aktif lain
+      if (e.statusCode == 409) {
+        _tampilkanDialogSudahPunyaAntrian(e.message);
+        return;
+      }
+
+      // Sisanya (BR2 interval 90 hari, kuota habis, dll) -- tampilkan
+      // pesan asli dari server apa adanya, itu sudah cukup jelas.
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _sedangProses = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Terjadi kesalahan, coba lagi')),
+      );
+    }
+  }
+
+  void _tampilkanDialogKuesionerBelumDiisi() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Lengkapi kuesioner dulu'),
+        content: const Text(
+          'Anda perlu mengisi kuesioner kesehatan pra-donor minimal sekali '
+          'sebelum bisa mengambil nomor antrian.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Nanti'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HasilKuesionerScreen()),
+              );
+            },
+            child: const Text('Isi sekarang'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _tampilkanDialogSudahPunyaAntrian(String pesan) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sudah ada antrian aktif'),
+        content: Text(pesan),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Mengerti'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,22 +158,9 @@ class DetailJadwalScreen extends StatelessWidget {
               child: SizedBox(
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: habis
+                  onPressed: (habis || _sedangProses)
                       ? null
-                      : () {
-                          // RESTRUKTURISASI Modul 2: kuesioner kesehatan
-                          // sekarang independen (diisi kapan saja lewat
-                          // tab Profil), BUKAN lagi langkah wajib sebelum
-                          // ambil nomor antrian. Booking langsung lanjut
-                          // ke pemilihan slot waktu.
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  PilihSlotWaktuScreen(jadwal: jadwal),
-                            ),
-                          );
-                        },
+                      : _ambilNomorAntrian,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     disabledBackgroundColor: AppColors.buttonDisabledBg,
@@ -73,14 +169,23 @@ class DetailJadwalScreen extends StatelessWidget {
                     ),
                     elevation: 0,
                   ),
-                  child: Text(
-                    habis ? 'Kuota penuh' : 'Ambil nomor antrian',
-                    style: AppText.button.copyWith(
-                      color: habis
-                          ? AppColors.buttonDisabledText
-                          : Colors.white,
-                    ),
-                  ),
+                  child: _sedangProses
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          habis ? 'Kuota penuh' : 'Ambil nomor antrian',
+                          style: AppText.button.copyWith(
+                            color: habis
+                                ? AppColors.buttonDisabledText
+                                : Colors.white,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -134,10 +239,6 @@ class DetailJadwalScreen extends StatelessWidget {
     );
   }
 
-  // Mini map lokasi -- pakai flutter_map (bukan google_maps_flutter, biar
-  // konsisten dengan pola yang sudah dipakai di HasilPencarianScreen).
-  // Kalau lokasi belum punya koordinat, tampilkan placeholder informatif
-  // alih-alih peta kosong.
   Widget _buildPeta() {
     final lat = jadwal.lokasi.latitude;
     final lng = jadwal.lokasi.longitude;
@@ -162,10 +263,6 @@ class DetailJadwalScreen extends StatelessWidget {
       child: SizedBox(
         height: 160,
         child: IgnorePointer(
-          // Peta cuma buat preview visual di sini, bukan interaktif --
-          // biar gak rebutan gesture sama SingleChildScrollView di
-          // sekitarnya. Kalau mau full-interaktif, bungkus di halaman
-          // detail-peta terpisah.
           child: FlutterMap(
             options: MapOptions(initialCenter: titik, initialZoom: 15),
             children: [

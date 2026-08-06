@@ -106,7 +106,7 @@ class _KelolaPerangkatScreenState extends State<KelolaPerangkatScreen> {
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                 itemCount: _daftarSesi.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (context, i) => _buildSesiCard(_daftarSesi[i]),
               ),
             ),

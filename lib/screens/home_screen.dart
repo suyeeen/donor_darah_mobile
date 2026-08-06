@@ -1091,7 +1091,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Switch(
             value: aktif,
             onChanged: onChanged,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
           ),
         ],
       ),
@@ -1475,7 +1475,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _filterOptions.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final label = _filterOptions[i];
           final active = label == _filterLokasi;

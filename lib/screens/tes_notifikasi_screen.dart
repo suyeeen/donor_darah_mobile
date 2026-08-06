@@ -401,4 +401,4 @@ class _LogPesan {
   final Map<String, dynamic> data;
 
   _LogPesan({required this.waktu, this.judul, this.isi, this.data = const {}});
-}
+} 
