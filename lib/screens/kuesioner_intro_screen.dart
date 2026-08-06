@@ -1,15 +1,26 @@
 import 'package:flutter/material.dart';
-import '../models/jadwal_donor.dart';
+import 'package:provider/provider.dart';
+import '../models/pendonor.dart';
+import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'kuesioner_screen.dart';
 
+/// FR-2.2: pintu masuk kuesioner kesehatan pra-donor.
+///
+/// RESTRUKTURISASI Modul 2: dulu dibuka dari DetailJadwalScreen dengan
+/// parameter [jadwal] (nempel ke satu booking, langkah 2 dari 5). Sekarang
+/// berdiri sendiri di tab Pengaturan > Profil saya, TIDAK butuh jadwal
+/// apa pun -- kuesioner adalah bagian dari profil kesehatan pendonor,
+/// bisa diisi/diperbarui kapan saja, independen dari sedang booking atau
+/// tidak.
 class KuesionerIntroScreen extends StatelessWidget {
-  final JadwalDonor jadwal;
-
-  const KuesionerIntroScreen({super.key, required this.jadwal});
+  const KuesionerIntroScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final riwayat = context.watch<AuthProvider>().riwayatKesehatan;
+    final hasilKuesioner = riwayat?.hasilKuesioner;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -19,21 +30,19 @@ class KuesionerIntroScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeader(context),
-              const SizedBox(height: 32),
-              _buildJadwalCard(),
-              const SizedBox(height: 16),
-              _buildKuotaRow(),
-              const SizedBox(height: 16),
-              _buildSebelumLanjutCard(),
+              const SizedBox(height: 24),
+              if (hasilKuesioner != null) ...[
+                _buildStatusTerakhirCard(hasilKuesioner),
+                const SizedBox(height: 16),
+              ],
+              _buildInfoCard(),
               const SizedBox(height: 32),
               SizedBox(
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => KuesionerScreen(jadwal: jadwal),
-                    ),
+                    MaterialPageRoute(builder: (_) => const KuesionerScreen()),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
@@ -43,7 +52,9 @@ class KuesionerIntroScreen extends StatelessWidget {
                     elevation: 0,
                   ),
                   child: Text(
-                    'Mulai kuesioner kesehatan',
+                    hasilKuesioner != null
+                        ? 'Isi ulang kuesioner'
+                        : 'Mulai kuesioner kesehatan',
                     style: AppText.button.copyWith(color: Colors.white),
                   ),
                 ),
@@ -66,7 +77,7 @@ class KuesionerIntroScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'LANGKAH 2 DARI 5',
+                'PROFIL KESEHATAN',
                 style: AppText.label.copyWith(
                   color: AppColors.primary,
                   letterSpacing: 1.4,
@@ -75,7 +86,7 @@ class KuesionerIntroScreen extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'Detail kegiatan donor',
+                'Kuesioner kesehatan pra-donor',
                 style: AppText.headline.copyWith(fontSize: 19),
               ),
             ],
@@ -102,132 +113,61 @@ class KuesionerIntroScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildJadwalCard() {
+  Widget _buildStatusTerakhirCard(HasilKuesioner hasil) {
+    final lolos = hasil.hasilScreeningAwal == 'lolos_screening_awal';
     return Container(
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: lolos ? AppColors.success : AppColors.primary,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.inputBorder),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            jadwal.namaKegiatan ??
-                'Donor Darah Bersama ${jadwal.lokasi.namaLokasi}',
-            style: AppText.headline.copyWith(fontSize: 16),
+          Icon(
+            lolos ? Icons.verified_outlined : Icons.info_outline,
+            color: Colors.white,
+            size: 28,
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(
-                Icons.badge_outlined,
-                size: 13,
-                color: AppColors.textMuted,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'PMI ${jadwal.lokasi.namaLokasi}',
-                  style: AppText.helper.copyWith(fontSize: 12),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  lolos
+                      ? 'Hasil terakhir: lolos self-assessment'
+                      : 'Hasil terakhir: perlu pemeriksaan lanjutan',
+                  style: AppText.inputText.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _infoRow(
-            Icons.calendar_today_outlined,
-            'Tanggal',
-            '${jadwal.tanggal.day}/${jadwal.tanggal.month}/${jadwal.tanggal.year}',
-          ),
-          const SizedBox(height: 12),
-          _infoRow(Icons.access_time, 'Jam operasional', jadwal.slotWaktu),
-          const SizedBox(height: 12),
-          _infoRow(
-            Icons.location_on_outlined,
-            'Lokasi',
-            '${jadwal.lokasi.namaLokasi}\n${jadwal.lokasi.alamat}',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: AppColors.neutralMuted),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label.toUpperCase(),
-                style: AppText.label.copyWith(
-                  color: AppColors.neutralMuted,
-                  fontSize: 11,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                value,
-                style: AppText.inputText.copyWith(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildKuotaRow() {
-    return Row(
-      children: [
-        Expanded(child: _kuotaChip('Kuota', '${jadwal.kuotaTotal}')),
-        const SizedBox(width: 8),
-        Expanded(child: _kuotaChip('Terisi', '${jadwal.kuotaTerisi}')),
-        const SizedBox(width: 8),
-        Expanded(child: _kuotaChip('Sisa', '${jadwal.kuotaTersisa}')),
-      ],
-    );
-  }
-
-  Widget _kuotaChip(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.tabInactiveBg,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: AppText.label.copyWith(
-              color: AppColors.neutralMuted,
-              fontSize: 10,
+                if (hasil.diisiPada != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Diisi ${_formatTanggal(hasil.diisiPada!)}',
+                    style: AppText.helper.copyWith(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(value, style: AppText.headline.copyWith(fontSize: 14)),
         ],
       ),
     );
   }
 
-  Widget _buildSebelumLanjutCard() {
+  Widget _buildInfoCard() {
     const poin = [
-      'Isi kuesioner kesehatan pra-donor (self-assessment) — sekitar 1 menit.',
-      'Sistem akan memverifikasi interval donor 90 hari dan kelayakan dasar Anda.',
-      'Setelah lolos, Anda dapat memilih slot waktu dan mengambil nomor antrian.',
+      'Jawab sejujurnya -- ini self-assessment awal, bukan keputusan final.',
+      'Hasilnya HANYA gambaran awal; kelayakan donor tetap ditentukan '
+          'petugas medis/skrining saat Anda datang ke lokasi.',
+      'Bisa diisi ulang kapan saja lewat halaman ini kalau ada perubahan '
+          'kondisi kesehatan.',
     ];
 
     return Container(
@@ -241,7 +181,7 @@ class KuesionerIntroScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Sebelum lanjut',
+            'Yang perlu diketahui',
             style: AppText.headline.copyWith(fontSize: 13),
           ),
           const SizedBox(height: 12),
@@ -256,5 +196,23 @@ class KuesionerIntroScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatTanggal(DateTime tanggal) {
+    const bulan = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
+    ];
+    return '${tanggal.day} ${bulan[tanggal.month - 1]} ${tanggal.year}';
   }
 }

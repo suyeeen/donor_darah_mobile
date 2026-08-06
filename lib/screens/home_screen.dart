@@ -912,7 +912,7 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Tentang aplikasi',
               subtitle: '',
               onTap: () => _tampilkanInfoSederhana(
-                judul: 'Tentang Donor',
+                judul: 'Tentang Atrian Donor',
                 pesan:
                     ' -- Sistem Antrian Online Donor Darah\nVersi '
                     '1.0.0\n\nTerintegrasi dengan PMI/UDD untuk pendaftaran '
