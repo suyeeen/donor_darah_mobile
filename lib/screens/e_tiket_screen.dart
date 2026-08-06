@@ -34,11 +34,16 @@ class _ETiketScreenState extends State<ETiketScreen> {
 
   // GAP: nomor antrian seharusnya datang dari response API "ambil nomor
   // antrian" (FR-4.2), bukan dibikin di client. Mock ini cuma buat preview UI.
-  int get _nomorUrutAntrian =>
-      Random(jadwal.idJadwal + slot.jamMulai.hashCode).nextInt(999) + 1;
+  int get _nomorUrutAntrian => slot.pendaftar + 1;
 
   String get _nomorAntrian =>
       'A-${_nomorUrutAntrian.toString().padLeft(3, '0')}';
+
+  String get _qrCodeHash {
+    final acak = Random(jadwal.idJadwal + slot.jamMulai.hashCode);
+    const hex = '0123456789abcdef';
+    return List.generate(32, (_) => hex[acak.nextInt(16)]).join();
+  }
 
   @override
   void initState() {
@@ -53,7 +58,7 @@ class _ETiketScreenState extends State<ETiketScreen> {
           jadwal: jadwal,
           nomorUrut: _nomorUrutAntrian,
           status: StatusAntrian.menunggu,
-          qrCode: 'QR-DEMO-$_nomorAntrian',
+          qrCode: _qrCodeHash,
           batasWaktuCheckin: null,
           jumlahDidepan: jumlahDidepan,
           estimasiMenit: jumlahDidepan * 8,

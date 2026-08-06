@@ -4,6 +4,8 @@ import '../models/jadwal_donor.dart';
 import '../providers/kuesioner_provider.dart';
 import '../theme/app_theme.dart';
 import 'verifikasi_kelayakan_screen.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 
 class KuesionerScreen extends StatefulWidget {
   final JadwalDonor jadwal;
@@ -28,10 +30,14 @@ class _KuesionerScreenState extends State<KuesionerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final jenisKelamin = context.read<AuthProvider>().pendonor?.jenisKelamin;
+
     return ChangeNotifierProvider.value(
       value: _provider,
       child: Consumer<KuesionerProvider>(
         builder: (context, provider, _) {
+          final daftarPertanyaan = provider.pertanyaanUntuk(jenisKelamin);
+
           return Scaffold(
             backgroundColor: AppColors.background,
             body: SafeArea(
@@ -49,12 +55,8 @@ class _KuesionerScreenState extends State<KuesionerScreen> {
                           const SizedBox(height: 20),
                           _buildUkuranRow(provider),
                           const SizedBox(height: 16),
-                          for (
-                            var i = 0;
-                            i < daftarPertanyaanKesehatan.length;
-                            i++
-                          ) ...[
-                            _buildPertanyaanCard(provider, i),
+                          for (final pertanyaan in daftarPertanyaan) ...[
+                            _buildPertanyaanCard(provider, pertanyaan),
                             const SizedBox(height: 16),
                           ],
                         ],
@@ -66,7 +68,7 @@ class _KuesionerScreenState extends State<KuesionerScreen> {
                     child: SizedBox(
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: provider.semuaTerjawab
+                        onPressed: provider.semuaTerjawab(jenisKelamin)
                             ? () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -90,7 +92,7 @@ class _KuesionerScreenState extends State<KuesionerScreen> {
                         child: Text(
                           'Konfirmasi',
                           style: AppText.button.copyWith(
-                            color: provider.semuaTerjawab
+                            color: provider.semuaTerjawab(jenisKelamin)
                                 ? Colors.white
                                 : AppColors.buttonDisabledText,
                           ),
@@ -245,9 +247,11 @@ class _KuesionerScreenState extends State<KuesionerScreen> {
     );
   }
 
-  Widget _buildPertanyaanCard(KuesionerProvider provider, int index) {
-    final pertanyaan = daftarPertanyaanKesehatan[index];
-    final jawabanSaatIni = provider.jawaban[index];
+  Widget _buildPertanyaanCard(
+    KuesionerProvider provider,
+    PertanyaanKesehatan pertanyaan,
+  ) {
+    final jawabanSaatIni = provider.jawaban[pertanyaan.key];
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -259,26 +263,12 @@ class _KuesionerScreenState extends State<KuesionerScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: '${index + 1}. ',
-                  style: AppText.inputText.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13.5,
-                    color: AppColors.neutralMuted,
-                  ),
-                ),
-                TextSpan(
-                  text: pertanyaan.pertanyaan,
-                  style: AppText.inputText.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13.5,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
+          Text(
+            pertanyaan.pertanyaan,
+            style: AppText.inputText.copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: 13.5,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 4),
@@ -293,7 +283,7 @@ class _KuesionerScreenState extends State<KuesionerScreen> {
                 child: _jawabanButton(
                   label: 'ya',
                   aktif: jawabanSaatIni == true,
-                  onTap: () => provider.jawab(index, true),
+                  onTap: () => provider.jawab(pertanyaan.key, true),
                 ),
               ),
               const SizedBox(width: 8),
@@ -301,7 +291,7 @@ class _KuesionerScreenState extends State<KuesionerScreen> {
                 child: _jawabanButton(
                   label: 'tidak',
                   aktif: jawabanSaatIni == false,
-                  onTap: () => provider.jawab(index, false),
+                  onTap: () => provider.jawab(pertanyaan.key, false),
                 ),
               ),
             ],

@@ -4,6 +4,8 @@ import '../models/jadwal_donor.dart';
 import '../providers/kuesioner_provider.dart';
 import '../theme/app_theme.dart';
 import 'pilih_slot_waktu_screen.dart';
+import '../providers/auth_provider.dart';
+import 'package:provider/provider.dart' show Provider;
 
 class VerifikasiKelayakanScreen extends StatelessWidget {
   final JadwalDonor jadwal;
@@ -13,7 +15,8 @@ class VerifikasiKelayakanScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<KuesionerProvider>();
-    final lolos = provider.lolosSemua;
+    final jenisKelamin = context.read<AuthProvider>().pendonor?.jenisKelamin;
+    final lolos = provider.lolosSemua(jenisKelamin);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -30,7 +33,7 @@ class VerifikasiKelayakanScreen extends StatelessWidget {
                     const SizedBox(height: 24),
                     _buildHasilCard(lolos),
                     const SizedBox(height: 24),
-                    for (final hasil in provider.daftarHasil) ...[
+                    for (final hasil in provider.daftarHasil(jenisKelamin)) ...[
                       _buildChecklistItem(hasil),
                       const SizedBox(height: 12),
                     ],

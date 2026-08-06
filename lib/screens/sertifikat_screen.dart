@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
+import '../models/pendonor.dart';
 import '../models/riwayat_donor.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
@@ -71,7 +72,6 @@ class _SertifikatScreenState extends State<SertifikatScreen> {
     final namaTampil = (pendonor?.nama.isNotEmpty ?? false)
         ? pendonor!.nama
         : 'Pendonor';
-    final golonganDarah = pendonor?.golonganDarah;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -87,7 +87,7 @@ class _SertifikatScreenState extends State<SertifikatScreen> {
                 child: SingleChildScrollView(
                   child: RepaintBoundary(
                     key: _sertifikatKey,
-                    child: _buildKartuSertifikat(namaTampil, golonganDarah),
+                    child: _buildKartuSertifikat(namaTampil, pendonor),
                   ),
                 ),
               ),
@@ -163,7 +163,7 @@ class _SertifikatScreenState extends State<SertifikatScreen> {
     );
   }
 
-  Widget _buildKartuSertifikat(String namaTampil, String? golonganDarah) {
+  Widget _buildKartuSertifikat(String namaTampil, Pendonor? pendonor) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFFDFBFA),
@@ -253,10 +253,9 @@ class _SertifikatScreenState extends State<SertifikatScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      // Diambil dari Pendonor.golonganDarah (AuthProvider).
-                      // Nullable karena belum tentu udah diisi lewat form
-                      // "Lengkapi Profil" -- fallback ke '-' kalau kosong.
-                      golonganDarah ?? '-',
+                      // Sesuai enum asli di database: cuma A/B/AB/O/Belum
+                      // Diketahui -- TIDAK ada rhesus (+/-).
+                      pendonor?.golonganDarah ?? 'Belum Diketahui',
                       style: AppText.headline.copyWith(
                         color: AppColors.primary,
                         fontSize: 15,

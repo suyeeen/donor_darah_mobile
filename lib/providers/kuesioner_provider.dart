@@ -1,47 +1,65 @@
 import 'package:flutter/foundation.dart';
 
 class PertanyaanKesehatan {
+  final String key;
   final String pertanyaan;
   final String subteks;
 
-  /// true = jawaban "ya" yang dianggap lolos, false = jawaban "tidak"
-  /// yang dianggap lolos. Beda-beda tergantung isi pertanyaannya.
   final bool jawabanLolosAdalahYa;
+  final bool khususPerempuan;
 
   const PertanyaanKesehatan({
+    required this.key,
     required this.pertanyaan,
     required this.subteks,
     required this.jawabanLolosAdalahYa,
+    this.khususPerempuan = false,
   });
 }
 
-/// GAP PENTING: di file Figma (node 4:1338 / "Android Compact - 14"), cuma
-/// pertanyaan #1 yang punya teks asli. 3 kartu pertanyaan lainnya di desain
-/// itu COPY PERSIS dari kartu pertama (placeholder yang belum diisi
-/// designer-nya). 3 pertanyaan di bawah ini (index 1-3) gue susun sendiri
-/// berdasarkan kriteria skrining donor darah yang umum dipakai PMI/WHO --
-/// INI BUKAN KEPUTUSAN FINAL, wajib direview & disahkan tim medis/PMI
-/// sebelum dipakai di app beneran.
-const List<PertanyaanKesehatan> daftarPertanyaanKesehatan = [
+const List<PertanyaanKesehatan> semuaPertanyaanKesehatan = [
   PertanyaanKesehatan(
+    key: 'sudah_makan',
+    pertanyaan: 'Apakah Anda sudah makan sebelum donor hari ini?',
+    subteks: 'Donor dalam kondisi perut kosong berisiko pusing/pingsan.',
+    jawabanLolosAdalahYa: true,
+  ),
+  PertanyaanKesehatan(
+    key: 'tidur_cukup',
+    pertanyaan: 'Apakah Anda tidur cukup malam sebelumnya?',
+    subteks: 'Minimal sekitar 6 jam.',
+    jawabanLolosAdalahYa: true,
+  ),
+  PertanyaanKesehatan(
+    key: 'kondisi_sehat',
     pertanyaan: 'Apakah Anda merasa sehat dan bugar hari ini?',
     subteks: 'Tanpa demam, batuk, atau flu dalam 7 hari terakhir.',
     jawabanLolosAdalahYa: true,
   ),
   PertanyaanKesehatan(
+    key: 'konsumsi_obat',
     pertanyaan: 'Apakah Anda sedang mengonsumsi obat resep atau antibiotik?',
     subteks: 'Termasuk obat yang diminum dalam 7 hari terakhir.',
     jawabanLolosAdalahYa: false,
   ),
   PertanyaanKesehatan(
+    key: 'hamil_menyusui',
+    pertanyaan: 'Apakah Anda sedang hamil atau menyusui?',
+    subteks: 'Khusus pendonor perempuan.',
+    jawabanLolosAdalahYa: false,
+    khususPerempuan: true,
+  ),
+  PertanyaanKesehatan(
+    key: 'transfusi_setahun',
     pertanyaan:
-        'Apakah Anda membuat tato, tindik, atau menjalani operasi kecil?',
-    subteks: 'Dalam 6 bulan terakhir.',
+        'Apakah Anda pernah menerima transfusi darah dalam 1 tahun terakhir?',
+    subteks: 'Termasuk transfusi karena operasi atau kecelakaan.',
     jawabanLolosAdalahYa: false,
   ),
   PertanyaanKesehatan(
-    pertanyaan: 'Apakah Anda mengonsumsi alkohol dalam 24 jam terakhir?',
-    subteks: 'Termasuk minuman beralkohol dalam bentuk apa pun.',
+    key: 'operasi_enam_bulan',
+    pertanyaan: 'Apakah Anda menjalani operasi atau tindakan medis besar?',
+    subteks: 'Dalam 6 bulan terakhir.',
     jawabanLolosAdalahYa: false,
   ),
 ];
@@ -61,10 +79,17 @@ class HasilVerifikasi {
 class KuesionerProvider extends ChangeNotifier {
   double? beratBadan;
   double? tidurJam;
-  final List<bool?> jawaban = List<bool?>.filled(
-    daftarPertanyaanKesehatan.length,
-    null,
-  );
+
+  final Map<String, bool?> jawaban = {
+    for (final p in semuaPertanyaanKesehatan) p.key: null,
+  };
+
+  List<PertanyaanKesehatan> pertanyaanUntuk(String? jenisKelamin) {
+    if (jenisKelamin == 'L') {
+      return semuaPertanyaanKesehatan.where((p) => !p.khususPerempuan).toList();
+    }
+    return semuaPertanyaanKesehatan;
+  }
 
   void setBeratBadan(String value) {
     beratBadan = double.tryParse(value);
@@ -76,40 +101,36 @@ class KuesionerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void jawab(int index, bool value) {
-    jawaban[index] = value;
+  void jawab(String key, bool value) {
+    jawaban[key] = value;
     notifyListeners();
   }
 
-  bool get semuaTerjawab =>
-      beratBadan != null && tidurJam != null && !jawaban.contains(null);
+  bool semuaTerjawab(String? jenisKelamin) {
+    if (beratBadan == null || tidurJam == null) return false;
+    return pertanyaanUntuk(jenisKelamin).every((p) => jawaban[p.key] != null);
+  }
 
-  // GAP: interval donor 90 hari butuh tanggal donor terakhir dari endpoint
-  // riwayat donor pendonor yang sedang login. Endpoint itu belum ada, jadi
-  // di-mock dulu di sini biar alur UI bisa didemokan. Ganti angka ini jadi
-  // hasil hitung asli begitu API riwayat donor siap.
   static const int _mockHariSejakDonorTerakhir = 123;
 
   bool get lolosIntervalDonor => _mockHariSejakDonorTerakhir >= 90;
   bool get lolosBeratBadan => (beratBadan ?? 0) >= 45;
-
-  // ASUMSI: ambang batas "istirahat cukup" gue tetapkan >= 6 jam. Angka ini
-  // gak ada acuan medisnya di desain, cuma tebakan wajar -- sesuaikan kalau
-  // ada standar resmi dari PMI.
   bool get lolosIstirahat => (tidurJam ?? 0) >= 6;
 
-  bool get lolosKuesioner {
-    for (var i = 0; i < daftarPertanyaanKesehatan.length; i++) {
-      final harusJawab = daftarPertanyaanKesehatan[i].jawabanLolosAdalahYa;
-      if (jawaban[i] != harusJawab) return false;
+  bool lolosKuesioner(String? jenisKelamin) {
+    for (final p in pertanyaanUntuk(jenisKelamin)) {
+      if (jawaban[p.key] != p.jawabanLolosAdalahYa) return false;
     }
     return true;
   }
 
-  bool get lolosSemua =>
-      lolosIntervalDonor && lolosBeratBadan && lolosIstirahat && lolosKuesioner;
+  bool lolosSemua(String? jenisKelamin) =>
+      lolosIntervalDonor &&
+      lolosBeratBadan &&
+      lolosIstirahat &&
+      lolosKuesioner(jenisKelamin);
 
-  List<HasilVerifikasi> get daftarHasil => [
+  List<HasilVerifikasi> daftarHasil(String? jenisKelamin) => [
     HasilVerifikasi(
       judul: 'Interval donor 90 hari',
       subjudul: '$_mockHariSejakDonorTerakhir hari sejak donor terakhir Anda.',
@@ -127,10 +148,31 @@ class KuesionerProvider extends ChangeNotifier {
     ),
     HasilVerifikasi(
       judul: 'Kuesioner kesehatan pra-donor',
-      subjudul: lolosKuesioner
+      subjudul: lolosKuesioner(jenisKelamin)
           ? 'Semua jawaban Anda memenuhi kriteria dasar.'
           : 'Ada jawaban yang belum memenuhi kriteria dasar.',
-      lolos: lolosKuesioner,
+      lolos: lolosKuesioner(jenisKelamin),
     ),
   ];
+
+  Map<String, dynamic> keJsonHasilKuesioner(String? jenisKelamin) {
+    final pertanyaanAktif = pertanyaanUntuk(jenisKelamin);
+    final jawabanYaTidak = {
+      for (final p in pertanyaanAktif)
+        p.key: (jawaban[p.key] ?? false) ? 'ya' : 'tidak',
+    };
+    final flagRisiko = pertanyaanAktif
+        .where((p) => jawaban[p.key] != p.jawabanLolosAdalahYa)
+        .map((p) => p.key)
+        .toList();
+
+    return {
+      'jawaban': jawabanYaTidak,
+      'diisi_pada': DateTime.now().toIso8601String(),
+      'flag_risiko': flagRisiko,
+      'hasil_screening_awal': flagRisiko.isEmpty
+          ? 'lolos_screening_awal'
+          : 'perlu_pemeriksaan_lanjutan',
+    };
+  }
 }
