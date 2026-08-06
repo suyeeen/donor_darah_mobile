@@ -192,7 +192,7 @@ class _KuesionerScreenState extends State<KuesionerScreen> {
             onChanged: provider.setBeratBadan,
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 7),
         Expanded(
           child: _numberField(
             label: 'Tidur (jam)',

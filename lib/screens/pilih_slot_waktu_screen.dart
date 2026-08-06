@@ -139,7 +139,7 @@ class _PilihSlotWaktuScreenState extends State<PilihSlotWaktuScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'LANGKAH 5 DARI 10',
+                'LANGKAH 5 DARI 5',
                 style: AppText.label.copyWith(
                   color: AppColors.primary,
                   letterSpacing: 1.4,

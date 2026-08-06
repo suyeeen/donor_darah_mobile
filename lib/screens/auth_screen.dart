@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
+import 'lupa_password_screen.dart';
+import 'verifikasi_otp_screen.dart';
 import '../providers/notifikasi_provider.dart';
 import '../widgets/notifikasi_permission_dialog.dart';
 
@@ -17,7 +19,8 @@ class _AuthScreenState extends State<AuthScreen> {
   int _tabIndex = 0; // 0 = Masuk, 1 = Registrasi
 
   final _formKeyMasuk = GlobalKey<FormState>();
-  final _teleponMasukController = TextEditingController();
+  // Backend Auth::login() cuma terima email, bukan nomor telepon.
+  final _emailMasukController = TextEditingController();
   final _sandiMasukController = TextEditingController();
 
   // Form Registrasi
@@ -25,15 +28,19 @@ class _AuthScreenState extends State<AuthScreen> {
   final _namaController = TextEditingController();
   final _nikController = TextEditingController();
   final _teleponDaftarController = TextEditingController();
+  final _emailDaftarController = TextEditingController();
   final _sandiDaftarController = TextEditingController();
+  DateTime? _tanggalLahir;
+  String? _jenisKelamin; // 'L' | 'P'
 
   @override
   void dispose() {
-    _teleponMasukController.dispose();
+    _emailMasukController.dispose();
     _sandiMasukController.dispose();
     _namaController.dispose();
     _nikController.dispose();
     _teleponDaftarController.dispose();
+    _emailDaftarController.dispose();
     _sandiDaftarController.dispose();
     super.dispose();
   }
@@ -42,14 +49,17 @@ class _AuthScreenState extends State<AuthScreen> {
       _namaController.text.trim().isNotEmpty &&
       _nikController.text.trim().length == 16 &&
       _teleponDaftarController.text.trim().isNotEmpty &&
-      _sandiDaftarController.text.isNotEmpty;
+      _emailDaftarController.text.trim().isNotEmpty &&
+      _sandiDaftarController.text.isNotEmpty &&
+      _tanggalLahir != null &&
+      _jenisKelamin != null;
 
   Future<void> _submitMasuk() async {
     if (!_formKeyMasuk.currentState!.validate()) return;
 
     final auth = context.read<AuthProvider>();
     final sukses = await auth.login(
-      _teleponMasukController.text.trim(),
+      _emailMasukController.text.trim(),
       _sandiMasukController.text,
     );
 
@@ -68,22 +78,32 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submitDaftar() async {
     if (!_formKeyDaftar.currentState!.validate()) return;
+    if (_tanggalLahir == null || _jenisKelamin == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lengkapi tanggal lahir dan jenis kelamin'),
+        ),
+      );
+      return;
+    }
 
     final auth = context.read<AuthProvider>();
     final sukses = await auth.register(
       nik: _nikController.text.trim(),
       nama: _namaController.text.trim(),
-      noTelepon: _teleponDaftarController.text.trim(),
+      tanggalLahir: _tanggalLahir!,
+      jenisKelamin: _jenisKelamin!,
+      noTelp: _teleponDaftarController.text.trim(),
+      email: _emailDaftarController.text.trim(),
       password: _sandiDaftarController.text,
     );
 
     if (!mounted) return;
 
     if (sukses) {
-      // Popup izin notifikasi ditampilkan DI SINI, tepat setelah registrasi
-      // sukses -- sebelum pindah ke Home. Dicek dulu lewat flag
-      // sudahTanyaIzinDevice biar gak nanya dua kali kalau nanti pendonor
-      // juga lewat ETiketScreen (flag-nya sama, tersimpan di SharedPreferences).
+      // Popup izin notifikasi ditampilkan DI SINI, sebelum ke layar OTP --
+      // biar tetap satu kali saja per instalasi (flag di SharedPreferences,
+      // sama seperti dicek juga di ETiketScreen).
       final notifProvider = context.read<NotifikasiProvider>();
       await notifProvider.cekSudahTanyaIzinDevice();
       if (!notifProvider.sudahTanyaIzinDevice && mounted) {
@@ -92,18 +112,29 @@ class _AuthScreenState extends State<AuthScreen> {
 
       if (!mounted) return;
 
-      // TODO: idealnya lempar ke screen "Lengkapi Profil" dulu (tanggal
-      // lahir, jenis kelamin, golongan darah -- FR-2.1) sebelum ke Home,
-      // karena data itu belum dikumpulkan di form registrasi ini.
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-        (route) => false,
-      );
+      // FR-1.1: akun belum aktif sampai OTP diverifikasi -- BUKAN langsung
+      // ke Home. VerifikasiOtpScreen yang bakal auto-login & lempar ke
+      // Home setelah OTP benar.
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const VerifikasiOtpScreen()));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(auth.errorMessage ?? 'Registrasi gagal')),
       );
     }
+  }
+
+  Future<void> _pilihTanggalLahir() async {
+    final sekarang = DateTime.now();
+    final hasil = await showDatePicker(
+      context: context,
+      initialDate: DateTime(sekarang.year - 20),
+      firstDate: DateTime(sekarang.year - 65),
+      lastDate: DateTime(sekarang.year - 17, sekarang.month, sekarang.day),
+      helpText: 'Tanggal Lahir',
+    );
+    if (hasil != null) setState(() => _tanggalLahir = hasil);
   }
 
   @override
@@ -260,12 +291,13 @@ class _AuthScreenState extends State<AuthScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildField(
-            label: 'Nomor ponsel',
-            controller: _teleponMasukController,
-            hint: '08xx-xxxx-xxxx',
-            keyboardType: TextInputType.phone,
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
+            label: 'Email',
+            controller: _emailMasukController,
+            hint: 'nama@email.com',
+            keyboardType: TextInputType.emailAddress,
+            validator: (v) => (v == null || !v.contains('@'))
+                ? 'Masukkan email yang valid'
+                : null,
           ),
           _buildField(
             label: 'Kata sandi',
@@ -274,10 +306,26 @@ class _AuthScreenState extends State<AuthScreen> {
             obscure: true,
             validator: (v) => (v == null || v.isEmpty) ? 'Wajib diisi' : null,
           ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LupaPasswordScreen()),
+              ),
+              style: TextButton.styleFrom(padding: EdgeInsets.zero),
+              child: Text(
+                'Lupa kata sandi?',
+                style: AppText.helper.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
           _buildPrivacyNote(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           _buildPrimaryButton(
-            label: 'Masuk dengan OTP',
+            label: 'Masuk',
             enabled: true,
             loading: loading,
             onTap: _submitMasuk,
@@ -320,7 +368,18 @@ class _AuthScreenState extends State<AuthScreen> {
                 (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
           ),
           _buildField(
-            label: 'kata sandi',
+            label: 'Email',
+            controller: _emailDaftarController,
+            hint: 'nama@email.com',
+            keyboardType: TextInputType.emailAddress,
+            validator: (v) => (v == null || !v.contains('@'))
+                ? 'Masukkan email yang valid'
+                : null,
+          ),
+          _buildTanggalLahirField(),
+          _buildJenisKelaminField(),
+          _buildField(
+            label: 'Kata sandi',
             controller: _sandiDaftarController,
             hint: '-----------',
             obscure: true,
@@ -336,6 +395,98 @@ class _AuthScreenState extends State<AuthScreen> {
             onTap: _submitDaftar,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTanggalLahirField() {
+    final label = _tanggalLahir == null
+        ? null
+        : '${_tanggalLahir!.day.toString().padLeft(2, '0')}/'
+              '${_tanggalLahir!.month.toString().padLeft(2, '0')}/'
+              '${_tanggalLahir!.year}';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Tanggal lahir', style: AppText.label),
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: _pilihTanggalLahir,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 13),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.inputBorder),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 16,
+                    color: AppColors.neutralMuted,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    label ?? 'Pilih tanggal (usia 17-65 tahun)',
+                    style: label == null
+                        ? AppText.placeholder
+                        : AppText.inputText,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJenisKelaminField() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Jenis kelamin', style: AppText.label),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: _jenisKelaminChip('L', 'Laki-laki')),
+              const SizedBox(width: 10),
+              Expanded(child: _jenisKelaminChip('P', 'Perempuan')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _jenisKelaminChip(String value, String label) {
+    final aktif = _jenisKelamin == value;
+    return GestureDetector(
+      onTap: () => setState(() => _jenisKelamin = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: aktif ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: aktif ? AppColors.primary : AppColors.inputBorder,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppText.inputText.copyWith(
+            color: aktif ? Colors.white : AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
