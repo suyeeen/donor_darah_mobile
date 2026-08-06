@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/jadwal_provider.dart';
 import 'hasil_pencarian_screen.dart';
+import 'peta_lokasi_screen.dart';
 
 class CariJadwalScreen extends StatefulWidget {
   const CariJadwalScreen({super.key});
@@ -52,7 +53,21 @@ class _CariJadwalScreenState extends State<CariJadwalScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Cari jadwal & lokasi')),
+      appBar: AppBar(
+        title: const Text('Cari jadwal & lokasi'),
+        actions: [
+          // FR-3.2: peta lokasi donor berdiri sendiri (semua lokasi
+          // aktif, bukan cuma yang lagi punya jadwal terbuka).
+          IconButton(
+            tooltip: 'Peta lokasi donor',
+            icon: const Icon(Icons.map_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PetaLokasiScreen()),
+            ),
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

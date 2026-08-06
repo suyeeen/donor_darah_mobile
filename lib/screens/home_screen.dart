@@ -932,7 +932,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ? pendonor!.nama
         : 'Nama Pengguna';
     final inisial = nama.trim().isNotEmpty ? nama.trim()[0].toUpperCase() : '?';
-    final noTelepon = pendonor?.noTelepon ?? '-';
+    final noTelepon = pendonor?.noTelp ?? '-';
 
     return InkWell(
       borderRadius: BorderRadius.circular(24),

@@ -3,7 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/jadwal_donor.dart';
 import '../theme/app_theme.dart';
-import 'kuesioner_intro_screen.dart';
+import 'pilih_slot_waktu_screen.dart';
 
 class DetailJadwalScreen extends StatelessWidget {
   final JadwalDonor jadwal;
@@ -52,11 +52,16 @@ class DetailJadwalScreen extends StatelessWidget {
                   onPressed: habis
                       ? null
                       : () {
+                          // RESTRUKTURISASI Modul 2: kuesioner kesehatan
+                          // sekarang independen (diisi kapan saja lewat
+                          // tab Profil), BUKAN lagi langkah wajib sebelum
+                          // ambil nomor antrian. Booking langsung lanjut
+                          // ke pemilihan slot waktu.
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) =>
-                                  KuesionerIntroScreen(jadwal: jadwal),
+                                  PilihSlotWaktuScreen(jadwal: jadwal),
                             ),
                           );
                         },
