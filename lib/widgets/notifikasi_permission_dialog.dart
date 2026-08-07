@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/notifikasi_provider.dart';
+import '../services/notifikasi_service.dart';
 import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
 
@@ -13,6 +15,7 @@ import '../theme/app_theme.dart';
 /// tersisa sekian orang di depan, dst).
 Future<void> showNotifikasiPermissionDialog(BuildContext context) async {
   final notifProvider = context.read<NotifikasiProvider>();
+  final authToken = context.read<AuthProvider>().token;
 
   await showDialog(
     context: context,
@@ -92,13 +95,27 @@ Future<void> showNotifikasiPermissionDialog(BuildContext context) async {
                       if (diizinkan) {
                         notifProvider.aktifkanNotifikasi();
 
-                        // Ambil token sekarang. Backend belum siap terima
-                        // ini, jadi sementara cuma di-log -- begitu
-                        // endpoint POST /device-token ada, kirim `token`
-                        // ke situ persis di titik ini.
-                        final token = await PushNotificationService.instance
+                        // Ambil token FCM device ini, lalu daftarkan ke
+                        // backend supaya petugas panggil antrian bisa
+                        // mem-push notifikasi ke device ini.
+                        final fcmToken = await PushNotificationService
+                            .instance
                             .ambilToken();
-                        debugPrint('FCM token pendonor: $token');
+
+                        if (fcmToken != null && authToken != null) {
+                          try {
+                            await NotifikasiService().daftarkanToken(
+                              token: authToken,
+                              fcmToken: fcmToken,
+                            );
+                          } catch (e) {
+                            // Gagal daftar token tidak boleh nge-block
+                            // alur pendaftaran antrian -- notifikasi
+                            // in-app (bell icon) tetap jalan biar pun
+                            // push-nya gagal. Cukup dicatat di log.
+                            debugPrint('Gagal daftarkan FCM token: $e');
+                          }
+                        }
                       }
 
                       if (dialogContext.mounted) {
