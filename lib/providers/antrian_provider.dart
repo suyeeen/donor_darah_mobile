@@ -13,6 +13,11 @@ class AntrianProvider extends ChangeNotifier {
   List<RiwayatAntrianRingkas> riwayat = [];
   String? errorMessage;
 
+  // Loading khusus buat aksi jadwal ulang, dipisah dari `status` biar
+  // AntrianTab tidak ikut nampilin full-screen loading pas cuma
+  // menjadwalkan ulang.
+  bool jadwalUlangLoading = false;
+
   Future<void> muatAntrianSaya({required String token}) async {
     status = AntrianStatusFetch.loading;
     errorMessage = null;
@@ -33,12 +38,16 @@ class AntrianProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// FIX: sekarang WAJIB kirim token (lihat AntrianService.ambilNomor).
   /// Dilempar ke pemanggil (bukan disimpan sebagai errorMessage) supaya
   /// DetailJadwalScreen bisa nangkep ApiException dan nge-branch UI beda
   /// tergantung penyebabnya (kuesioner belum diisi vs sudah ada antrian
-  /// aktif vs error lain) -- lihat pemakaiannya di detail_jadwal_screen.dart.
-  Future<AntrianDonor> ambilNomor({required int idJadwal}) async {
-    final hasil = await _service.ambilNomor(idJadwal: idJadwal);
+  /// aktif vs error lain).
+  Future<AntrianDonor> ambilNomor({
+    required int idJadwal,
+    required String token,
+  }) async {
+    final hasil = await _service.ambilNomor(idJadwal: idJadwal, token: token);
     antrianAktif = hasil;
     notifyListeners();
     return hasil;
@@ -49,6 +58,37 @@ class AntrianProvider extends ChangeNotifier {
     if (antrianAktif?.idAntrian == idAntrian) {
       antrianAktif = null;
       notifyListeners();
+    }
+  }
+
+  /// FR-4.4: PUT /antrian/:id/jadwal-ulang -- pindah antrian yang masih
+  /// 'menunggu' ke jadwal lain. Sukses -> [antrianAktif] diganti dari
+  /// respons server (nomor urut & QR baru, karena backend menerbitkan
+  /// ulang keduanya untuk jadwal baru).
+  Future<bool> jadwalUlang({
+    required int idAntrian,
+    required int idJadwalBaru,
+    required String token,
+  }) async {
+    jadwalUlangLoading = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      final hasil = await _service.jadwalUlang(
+        idAntrian: idAntrian,
+        idJadwalBaru: idJadwalBaru,
+        token: token,
+      );
+      antrianAktif = hasil;
+      jadwalUlangLoading = false;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+      jadwalUlangLoading = false;
+      notifyListeners();
+      return false;
     }
   }
 }

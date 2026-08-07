@@ -15,6 +15,7 @@ import 'cari_jadwal_screen.dart';
 import 'detail_jadwal_screen.dart';
 import 'kelola_perangkat_screen.dart';
 import 'notifikasi_screen.dart';
+import 'pilih_jadwal_ulang_screen.dart';
 import 'profil_screen.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'sertifikat_screen.dart';
@@ -90,6 +91,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final auth = context.watch<AuthProvider>();
     final pendonor = auth.pendonor;
     final jadwalProvider = context.watch<JadwalProvider>();
+    // BARU: dulu stat card ini isinya placeholder statis ("- kali", "-
+    // hari") -- sekarang dipakaikan data ASLI dari GET /riwayat (FR-8.3)
+    // yang sudah di-fetch di initState(), bukan dihitung ulang di client.
+    final riwayatProvider = context.watch<RiwayatProvider>();
 
     final daftarJadwal = _filterLokasi == 'Semua'
         ? jadwalProvider.hasil
@@ -106,9 +111,13 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 20),
           _buildStatCard(
             golonganDarah: pendonor?.golonganDarah ?? '-',
-            siapDonor: true,
-            totalDonor: '- kali',
-            sejakTerakhir: '- hari',
+            siapDonor: riwayatProvider.bolehDonorSekarang,
+            totalDonor: '${riwayatProvider.jumlahDonorBerhasil} kali',
+            sejakTerakhir:
+                riwayatProvider.bolehDonorSekarang ||
+                    riwayatProvider.estimasiDonorBerikutnya == null
+                ? 'Siap sekarang'
+                : 'Boleh lagi ${_formatTanggal(riwayatProvider.estimasiDonorBerikutnya!)}',
           ),
           const SizedBox(height: 24),
           _buildSearchField(),
@@ -238,7 +247,127 @@ class _HomeScreenState extends State<HomeScreen> {
         _buildTombolQr(antrian),
         const SizedBox(height: 12),
         _buildInfoOtomatis(),
+        // FR-4.4: batalkan & jadwal ulang cuma relevan selama status
+        // masih 'menunggu' -- backend menolak kalau sudah dipanggil/
+        // sedang diproses/selesai (lihat Antrian::batalkan()/
+        // jadwal_ulang() di backend, keduanya cek status di sana).
+        if (antrian.status == StatusAntrian.menunggu) ...[
+          const SizedBox(height: 12),
+          _buildTombolBatalkanJadwalUlang(antrian),
+        ],
       ],
+    );
+  }
+
+  Widget _buildTombolBatalkanJadwalUlang(AntrianDonor antrian) {
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: () => _bukaJadwalUlang(antrian),
+              icon: const Icon(Icons.event_repeat_outlined, size: 16),
+              label: const Text('Jadwal ulang'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textPrimary,
+                side: const BorderSide(color: AppColors.inputBorder),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: SizedBox(
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: () => _konfirmasiBatalkanAntrian(antrian),
+              icon: const Icon(Icons.close, size: 16),
+              label: const Text('Batalkan'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// FR-4.4: PUT /antrian/:id/batalkan lewat AntrianProvider.batalkan().
+  /// Slot langsung dikembalikan ke kuota tersedia oleh backend.
+  Future<void> _konfirmasiBatalkanAntrian(AntrianDonor antrian) async {
+    final konfirmasi = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Batalkan antrian?'),
+        content: Text(
+          'Nomor ${antrian.nomorAntrian} akan dibatalkan dan slotnya '
+          'dikembalikan ke kuota tersedia.',
+          style: AppText.helper,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Ya, batalkan',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (konfirmasi != true || !mounted) return;
+
+    final token = context.read<AuthProvider>().token;
+    if (token == null) return;
+
+    try {
+      await context.read<AntrianProvider>().batalkan(
+        idAntrian: antrian.idAntrian,
+        token: token,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Antrian berhasil dibatalkan')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal membatalkan antrian, coba lagi')),
+      );
+    }
+  }
+
+  /// FR-4.4: buka layar pilih jadwal baru buat PUT /antrian/:id/jadwal-ulang.
+  void _bukaJadwalUlang(AntrianDonor antrian) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PilihJadwalUlangScreen(antrianSaatIni: antrian),
+      ),
     );
   }
 
@@ -568,11 +697,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              // Kode QR asli dari antrian.qrCode. GAP: nilai qrCode
-              // sekarang cuma string dummy dari AntrianService/
-              // ETiketScreen -- begitu backend ngasih kode unik hasil
-              // INSERT ke tabel antrian, otomatis kepakai di sini tanpa
-              // ubah widget-nya.
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(

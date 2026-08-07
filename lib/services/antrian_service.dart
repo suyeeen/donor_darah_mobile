@@ -18,8 +18,15 @@ class AntrianService {
   ///   di-expose ApiClient krn cuma balikin Map data biasa -- kalau perlu
   ///   id itu, tangkap lewat try/catch manual di pemanggil).
   /// - 422 "Belum memenuhi interval minimal donor darah..." -> BR2
-  Future<AntrianDonor> ambilNomor({required int idJadwal}) async {
-    final data = await _client.post('/antrian', body: {'id_jadwal': idJadwal});
+  Future<AntrianDonor> ambilNomor({
+    required int idJadwal,
+    required String token,
+  }) async {
+    final data = await _client.post(
+      '/antrian',
+      body: {'id_jadwal': idJadwal},
+      token: token,
+    );
     return AntrianDonor.fromJson(data);
   }
 

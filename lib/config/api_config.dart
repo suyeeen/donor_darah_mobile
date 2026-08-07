@@ -1,11 +1,3 @@
-/// Konfigurasi terpusat buat komunikasi ke backend "sistem-antrian-donor"
-/// (CodeIgniter 3, punya temen). Semua Service HARUS ambil base URL dan
-/// path endpoint dari sini -- jangan hardcode string URL di file lain.
-///
-/// Endpoint & response shape di bawah ini disalin persis dari source
-/// controller backend (Auth.php, Profil.php, Antrian.php, Jadwal.php,
-/// Lokasi.php, Papan.php) + routes.php, bukan dari FRD/dokumen -- jadi
-/// dijamin cocok sama implementasi asli per 2026-08-06.
 class ApiConfig {
   ApiConfig._();
 
@@ -27,10 +19,6 @@ class ApiConfig {
 
   static const Duration timeout = Duration(seconds: 15);
 
-  // ---------------------------------------------------------------------
-  // Auth (Modul 1) -- semua publik (tanpa token) KECUALI sessions,
-  // logout, logout-others yang wajib Authorization: Bearer <token>.
-  // ---------------------------------------------------------------------
   static const String authRegister = '/auth/register';
   static const String authVerifyOtp = '/auth/verify-otp';
   static const String authResendOtp = '/auth/resend-otp';
@@ -40,23 +28,11 @@ class ApiConfig {
   static const String authSessions = '/auth/sessions';
   static const String authLogout = '/auth/logout';
   static const String authLogoutOthers = '/auth/logout-others';
-
-  // ---------------------------------------------------------------------
-  // Profil & Kuesioner (Modul 2) -- semua wajib token.
-  // ---------------------------------------------------------------------
   static const String profil = '/profil'; // GET & PUT
   static const String profilKuesioner = '/profil/kuesioner'; // GET & POST
   static const String profilKartuDonor = '/profil/kartu-donor';
-
-  // ---------------------------------------------------------------------
-  // Jadwal & Lokasi (Modul 3) -- publik, tanpa token.
-  // ---------------------------------------------------------------------
   static const String jadwalCari = '/jadwal/cari';
   static const String lokasiPeta = '/lokasi/peta';
-
-  // ---------------------------------------------------------------------
-  // Antrian (Modul 4) -- semua wajib token & role pendonor.
-  // ---------------------------------------------------------------------
   static const String antrian = '/antrian'; // POST ambil nomor
   static const String antrianSaya = '/antrian/saya';
   static String antrianDetail(int idAntrian) => '/antrian/$idAntrian';
@@ -64,17 +40,7 @@ class ApiConfig {
       '/antrian/$idAntrian/batalkan';
   static String antrianJadwalUlang(int idAntrian) =>
       '/antrian/$idAntrian/jadwal-ulang';
-
-  // ---------------------------------------------------------------------
-  // Papan Antrian Digital (Modul 5) -- publik, tanpa token.
-  // ---------------------------------------------------------------------
   static const String papanAntrian = '/papan-antrian';
-
-  // ---------------------------------------------------------------------
-  // Riwayat & Sertifikat Donor (FR-8.1 - FR-8.3) -- wajib token & role
-  // pendonor (lihat Riwayat.php). /sertifikat balikin file PDF langsung
-  // (bukan JSON envelope biasa), lihat ApiClient.getBytes().
-  // ---------------------------------------------------------------------
   static const String riwayat = '/riwayat';
   static String riwayatSertifikat(int idAntrian) =>
       '/riwayat/$idAntrian/sertifikat';

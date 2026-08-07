@@ -4,10 +4,12 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/jadwal_donor.dart';
 import '../providers/antrian_provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/api_exception.dart';
 import '../theme/app_theme.dart';
 import 'e_tiket_screen.dart';
 import 'hasil_kuesioner_screen.dart';
+import 'papan_antrian_screen.dart';
 
 class DetailJadwalScreen extends StatefulWidget {
   final JadwalDonor jadwal;
@@ -26,14 +28,31 @@ class _DetailJadwalScreenState extends State<DetailJadwalScreen> {
   /// FR-4.1: langsung POST /antrian -- TIDAK ada lagi langkah "pilih slot
   /// waktu" (backend cuma punya 1 slot_waktu tetap per jadwal_donor, jadi
   /// PilihSlotWaktuScreen yang lama sudah tidak relevan buat alur ini).
+  ///
+  /// FIX: sebelumnya method ini manggil antrianProvider.ambilNomor() TANPA
+  /// token -- padahal Antrian.php WAJIB Authorization: Bearer <token>
+  /// (verify_token() dipanggil di constructor-nya). Akibatnya request ini
+  /// SELALU gagal 401 "Token tidak ditemukan" walau pendonor sudah login.
+  /// Sekarang token diambil dari AuthProvider dan diteruskan ke
+  /// AntrianProvider.ambilNomor() / AntrianService.ambilNomor().
   Future<void> _ambilNomorAntrian() async {
     setState(() => _sedangProses = true);
 
     final antrianProvider = context.read<AntrianProvider>();
+    final token = context.read<AuthProvider>().token;
+
+    if (token == null) {
+      setState(() => _sedangProses = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sesi habis, silakan masuk kembali')),
+      );
+      return;
+    }
 
     try {
       final antrian = await antrianProvider.ambilNomor(
         idJadwal: jadwal.idJadwal,
+        token: token,
       );
       if (!mounted) return;
 
@@ -154,38 +173,70 @@ class _DetailJadwalScreenState extends State<DetailJadwalScreen> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: (habis || _sedangProses)
-                      ? null
-                      : _ambilNomorAntrian,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    disabledBackgroundColor: AppColors.buttonDisabledBg,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: (habis || _sedangProses)
+                          ? null
+                          : _ambilNomorAntrian,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        disabledBackgroundColor: AppColors.buttonDisabledBg,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: _sedangProses
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              habis ? 'Kuota penuh' : 'Ambil nomor antrian',
+                              style: AppText.button.copyWith(
+                                color: habis
+                                    ? AppColors.buttonDisabledText
+                                    : Colors.white,
+                              ),
+                            ),
                     ),
-                    elevation: 0,
                   ),
-                  child: _sedangProses
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          habis ? 'Kuota penuh' : 'Ambil nomor antrian',
-                          style: AppText.button.copyWith(
-                            color: habis
-                                ? AppColors.buttonDisabledText
-                                : Colors.white,
+                  const SizedBox(height: 10),
+                  // FR-5.4: papan antrian publik, TANPA token -- boleh
+                  // dilihat siapa saja termasuk sebelum ambil nomor,
+                  // dipajang di layar/TV lokasi (lihat Papan.php backend).
+                  SizedBox(
+                    height: 44,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PapanAntrianScreen(
+                            idJadwal: jadwal.idJadwal,
+                            namaLokasiAwal: jadwal.lokasi.namaLokasi,
                           ),
                         ),
-                ),
+                      ),
+                      icon: const Icon(Icons.tv_outlined, size: 18),
+                      label: const Text('Lihat papan antrian'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.textPrimary,
+                        side: const BorderSide(color: AppColors.inputBorder),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
