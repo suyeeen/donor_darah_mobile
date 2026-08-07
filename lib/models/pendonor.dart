@@ -1,3 +1,5 @@
+import '../utils/json_parse.dart';
+
 /// Data akun pendonor -- cocok 1:1 sama tabel `pendonor` (minus
 /// password_hash yang di-unset backend) dan sama field `akun` di respons
 /// `GET/PUT /profil` (lihat Profil::index()/update() di backend).
@@ -41,7 +43,7 @@ class Pendonor {
   /// jadi bentuk paling lengkap yang tersedia dari backend.
   factory Pendonor.fromJson(Map<String, dynamic> json) {
     return Pendonor(
-      idPendonor: json['id_pendonor'] as int,
+      idPendonor: parseIntField(json['id_pendonor']),
       nama: json['nama'] as String,
       email: json['email'] as String?,
       nik: json['nik'] as String?,
@@ -66,7 +68,7 @@ class Pendonor {
   /// balikin id_pendonor + nama + email (bukan objek `akun` penuh).
   factory Pendonor.minimalFromAuth(Map<String, dynamic> json) {
     return Pendonor(
-      idPendonor: json['id_pendonor'] as int,
+      idPendonor: parseIntField(json['id_pendonor']),
       nama: json['nama'] as String,
       email: json['email'] as String?,
     );
@@ -155,8 +157,8 @@ class RiwayatKesehatan {
 
   factory RiwayatKesehatan.fromJson(Map<String, dynamic> json) {
     return RiwayatKesehatan(
-      idRiwayat: json['id_riwayat'] as int,
-      beratBadan: (json['berat_badan'] as num?)?.toDouble(),
+      idRiwayat: parseIntField(json['id_riwayat']),
+      beratBadan: parseDoubleFieldOrNull(json['berat_badan']),
       tekananDarah: json['tekanan_darah'] as String?,
       penyakitBawaan: json['penyakit_bawaan'] as String?,
       riwayatDonorSebelumnya: json['riwayat_donor_sebelumnya'] as String?,

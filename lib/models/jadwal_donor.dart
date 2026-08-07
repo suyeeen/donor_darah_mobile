@@ -1,3 +1,4 @@
+import '../utils/json_parse.dart';
 import 'lokasi_donor.dart';
 
 /// Cocok sama respons ASLI `GET /jadwal/cari` (lihat Jadwal_model::cari()
@@ -62,20 +63,18 @@ class JadwalDonor {
 
   factory JadwalDonor.fromJson(Map<String, dynamic> json) {
     return JadwalDonor(
-      idJadwal: json['id_jadwal'] as int,
+      idJadwal: parseIntField(json['id_jadwal']),
       // LokasiDonor.fromJson dipanggil ke json YANG SAMA (bukan sub-map)
       // karena field lokasi (id_lokasi, nama_lokasi, jenis, alamat,
       // latitude, longitude) memang ada di level atas object ini.
       lokasi: LokasiDonor.fromJson(json),
       tanggal: DateTime.parse(json['tanggal'] as String),
       slotWaktu: json['slot_waktu'] as String,
-      kuotaTotal: json['kuota_total'] as int,
-      kuotaTersisa: json['kuota_tersisa'] as int,
+      kuotaTotal: parseIntField(json['kuota_total']),
+      kuotaTersisa: parseIntField(json['kuota_tersisa']),
       status: json['status'] as String?,
-      estimasiAntrian: json['estimasi_antrian'] as int?,
-      jarakKm: json['jarak_km'] != null
-          ? double.tryParse(json['jarak_km'].toString())
-          : null,
+      estimasiAntrian: parseIntFieldOrNull(json['estimasi_antrian']),
+      jarakKm: parseDoubleFieldOrNull(json['jarak_km']),
       namaKegiatan: json['nama_kegiatan'] as String?,
     );
   }

@@ -1,3 +1,4 @@
+import '../utils/json_parse.dart';
 import 'antrian_donor.dart';
 
 enum StatusKelayakan { layak, tidakLayak, ditunda }
@@ -55,8 +56,8 @@ class RiwayatDonor {
 
   factory RiwayatDonor.fromJson(Map<String, dynamic> json) {
     return RiwayatDonor(
-      idAntrian: json['id_antrian'] as int,
-      nomorUrut: json['nomor_urut'] as int,
+      idAntrian: parseIntField(json['id_antrian']),
+      nomorUrut: parseIntField(json['nomor_urut']),
       status: StatusAntrian.fromApi(json['status'] as String),
       tanggal: DateTime.parse(json['tanggal'] as String),
       slotWaktu: json['slot_waktu'] as String,
@@ -64,10 +65,8 @@ class RiwayatDonor {
       statusKelayakan: json['status_kelayakan'] != null
           ? statusKelayakanFromString(json['status_kelayakan'] as String)
           : null,
-      volumeDarah: json['volume_darah'] != null
-          ? double.tryParse(json['volume_darah'].toString())
-          : null,
-      sertifikatTersedia: json['sertifikat_tersedia'] as bool? ?? false,
+      volumeDarah: parseDoubleFieldOrNull(json['volume_darah']),
+      sertifikatTersedia: parseBoolField(json['sertifikat_tersedia']),
     );
   }
 }

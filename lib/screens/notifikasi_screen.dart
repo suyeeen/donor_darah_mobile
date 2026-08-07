@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/notifikasi.dart';
+import '../providers/auth_provider.dart';
 import '../providers/notifikasi_provider.dart';
 import '../theme/app_theme.dart';
 
+/// Modul Notifikasi (FR-6.1 - FR-6.4). Daftar notifikasi in-app pendonor,
+/// nyambung ke GET /notifikasi lewat NotifikasiProvider.
+///
+/// PENTING: endpoint ini butuh kolom `dibaca`/`dibaca_at` di tabel
+/// `notifikasi` backend -- tanpa itu, backend balikin 500. Lihat catatan
+/// ALTER TABLE yang sudah dibahas.
 class NotifikasiScreen extends StatefulWidget {
   const NotifikasiScreen({super.key});
 
@@ -12,26 +19,24 @@ class NotifikasiScreen extends StatefulWidget {
 }
 
 class _NotifikasiScreenState extends State<NotifikasiScreen> {
-  // null = tab "Semua"
-  KategoriNotifikasi? _filterAktif;
-
-  static const _tabs = <String, KategoriNotifikasi?>{
-    'Semua': null,
-    'Antrian': KategoriNotifikasi.antrian,
-    'Jadwal': KategoriNotifikasi.jadwal,
-    'Selesai': KategoriNotifikasi.selesai,
-  };
+  JenisNotifikasi? _filterAktif; // null = semua
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NotifikasiProvider>().muatNotifikasi();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _muatUlang());
+  }
+
+  Future<void> _muatUlang() async {
+    final token = context.read<AuthProvider>().token;
+    await context.read<NotifikasiProvider>().muatNotifikasi(token: token);
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<NotifikasiProvider>();
+    final daftar = provider.filter(_filterAktif);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -39,21 +44,14 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildHeader(context),
-                  const SizedBox(height: 20),
-                  _buildTabChips(),
-                ],
-              ),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: _buildHeader(context),
             ),
-            Expanded(
-              child: Consumer<NotifikasiProvider>(
-                builder: (context, provider, _) => _buildBody(provider),
-              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: _buildFilterChips(),
             ),
+            Expanded(child: _buildBody(provider, daftar)),
           ],
         ),
       ),
@@ -63,44 +61,46 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
   Widget _buildHeader(BuildContext context) {
     return Row(
       children: [
-        _backButton(context),
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.inputBorder),
+          ),
+          child: IconButton(
+            padding: EdgeInsets.zero,
+            icon: const Icon(Icons.chevron_left, size: 20),
+            onPressed: () => Navigator.maybePop(context),
+          ),
+        ),
         const SizedBox(width: 15),
         Text('Notifikasi', style: AppText.headline.copyWith(fontSize: 20)),
       ],
     );
   }
 
-  Widget _backButton(BuildContext context) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.inputBorder),
-      ),
-      child: IconButton(
-        padding: EdgeInsets.zero,
-        icon: const Icon(Icons.chevron_left, size: 20),
-        onPressed: () => Navigator.maybePop(context),
-      ),
-    );
-  }
+  Widget _buildFilterChips() {
+    final opsi = <(String, JenisNotifikasi?)>[
+      ('Semua', null),
+      ('Pendaftaran', JenisNotifikasi.konfirmasiPendaftaran),
+      ('Pengingat', JenisNotifikasi.pengingatH1),
+      ('Giliran', JenisNotifikasi.giliranMendekati),
+      ('Perubahan Jadwal', JenisNotifikasi.perubahanJadwal),
+    ];
 
-  Widget _buildTabChips() {
-    final entries = _tabs.entries.toList();
     return SizedBox(
       height: 32,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: entries.length,
+        itemCount: opsi.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          final label = entries[i].key;
-          final kategori = entries[i].value;
-          final active = kategori == _filterAktif;
+          final (label, jenis) = opsi[i];
+          final active = jenis == _filterAktif;
           return GestureDetector(
-            onTap: () => setState(() => _filterAktif = kategori),
+            onTap: () => setState(() => _filterAktif = jenis),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -125,7 +125,7 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
     );
   }
 
-  Widget _buildBody(NotifikasiProvider provider) {
+  Widget _buildBody(NotifikasiProvider provider, List<NotifikasiItem> daftar) {
     if (provider.status == NotifikasiStatusFetch.loading ||
         provider.status == NotifikasiStatusFetch.idle) {
       return const Center(child: CircularProgressIndicator());
@@ -135,71 +135,85 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(
-            'Gagal memuat notifikasi.\n${provider.errorMessage ?? ''}',
-            textAlign: TextAlign.center,
-            style: AppText.helper,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Gagal memuat notifikasi.\n${provider.errorMessage ?? ''}',
+                textAlign: TextAlign.center,
+                style: AppText.helper,
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: _muatUlang,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: Text(
+                  'Coba lagi',
+                  style: AppText.button.copyWith(color: Colors.white),
+                ),
+              ),
+            ],
           ),
         ),
       );
     }
 
-    final daftar = provider.filter(_filterAktif);
-
     if (daftar.isEmpty) {
-      return _buildEmptyState();
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.tabInactiveBg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.notifications_none_outlined,
+                  size: 28,
+                  color: AppColors.neutralMuted,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Belum ada notifikasi',
+                style: AppText.headline.copyWith(fontSize: 18),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Kabar soal antrian dan jadwal donor Anda bakal muncul di sini.',
+                style: AppText.helper,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-      itemCount: daftar.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (context, i) => _buildNotifikasiCard(daftar[i]),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.tabInactiveBg,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(
-                Icons.notifications_off_outlined,
-                size: 28,
-                color: AppColors.neutralMuted,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Belum ada notifikasi',
-              style: AppText.headline.copyWith(fontSize: 18),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Konfirmasi antrian, pengingat giliran, dan penerbitan '
-              'sertifikat akan muncul di sini.',
-              style: AppText.helper,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+    return RefreshIndicator(
+      onRefresh: _muatUlang,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        itemCount: daftar.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
+        itemBuilder: (context, i) => _buildNotifikasiCard(daftar[i]),
       ),
     );
   }
 
   Widget _buildNotifikasiCard(NotifikasiItem item) {
-    final info = _kategoriInfo(item.kategori);
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -207,7 +221,6 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: item.sudahDibaca ? AppColors.inputBorder : AppColors.primary,
-          width: item.sudahDibaca ? 1 : 1.5,
         ),
       ),
       child: Row(
@@ -216,57 +229,76 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
           Container(
             width: 40,
             height: 40,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: info.$2,
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.tabInactiveBg,
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(info.$1, size: 18, color: Colors.white),
+            child: Icon(
+              _ikonUntukJenis(item.jenis),
+              size: 18,
+              color: AppColors.primary,
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  item.judul,
-                  style: AppText.inputText.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.judul,
+                        style: AppText.inputText.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                    ),
+                    if (!item.sudahDibaca)
+                      Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(left: 8, top: 3),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 4),
-                Text(item.pesan, style: AppText.helper),
-                const SizedBox(height: 8),
+                Text(
+                  item.pesan,
+                  style: AppText.helper.copyWith(fontSize: 12.5),
+                ),
+                const SizedBox(height: 6),
                 Text(
                   _formatWaktu(item.waktu),
-                  style: AppText.helper.copyWith(fontSize: 10.5),
+                  style: AppText.helper.copyWith(
+                    fontSize: 10.5,
+                    color: AppColors.neutralMuted,
+                  ),
                 ),
               ],
             ),
           ),
-          if (!item.sudahDibaca) ...[
-            const SizedBox(width: 8),
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 
-  (IconData, Color) _kategoriInfo(KategoriNotifikasi kategori) {
-    switch (kategori) {
-      case KategoriNotifikasi.antrian:
-        return (Icons.confirmation_number_outlined, AppColors.primary);
-      case KategoriNotifikasi.jadwal:
-        return (Icons.calendar_month_outlined, AppColors.cardDark);
-      case KategoriNotifikasi.selesai:
-        return (Icons.workspace_premium_outlined, AppColors.success);
+  IconData _ikonUntukJenis(JenisNotifikasi jenis) {
+    switch (jenis) {
+      case JenisNotifikasi.konfirmasiPendaftaran:
+        return Icons.confirmation_number_outlined;
+      case JenisNotifikasi.pengingatH1:
+        return Icons.event_available_outlined;
+      case JenisNotifikasi.giliranMendekati:
+        return Icons.notifications_active_outlined;
+      case JenisNotifikasi.perubahanJadwal:
+        return Icons.update_outlined;
     }
   }
 
@@ -287,6 +319,6 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
     ];
     final j = waktu.hour.toString().padLeft(2, '0');
     final m = waktu.minute.toString().padLeft(2, '0');
-    return '${waktu.day} ${bulan[waktu.month - 1]} ${waktu.year} · $j:$m WIB';
+    return '${waktu.day} ${bulan[waktu.month - 1]} ${waktu.year}, $j:$m WIB';
   }
 }

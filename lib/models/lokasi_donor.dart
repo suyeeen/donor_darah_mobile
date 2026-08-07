@@ -1,3 +1,5 @@
+import '../utils/json_parse.dart';
+
 class LokasiDonor {
   final int idLokasi;
   final String namaLokasi;
@@ -17,16 +19,12 @@ class LokasiDonor {
 
   factory LokasiDonor.fromJson(Map<String, dynamic> json) {
     return LokasiDonor(
-      idLokasi: json['id_lokasi'] as int,
+      idLokasi: parseIntField(json['id_lokasi']),
       namaLokasi: json['nama_lokasi'] as String,
       jenis: json['jenis'] as String,
       alamat: json['alamat'] as String,
-      latitude: json['latitude'] != null
-          ? double.tryParse(json['latitude'].toString())
-          : null,
-      longitude: json['longitude'] != null
-          ? double.tryParse(json['longitude'].toString())
-          : null,
+      latitude: parseDoubleFieldOrNull(json['latitude']),
+      longitude: parseDoubleFieldOrNull(json['longitude']),
     );
   }
 }

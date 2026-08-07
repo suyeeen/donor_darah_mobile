@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/antrian_donor.dart';
@@ -33,16 +35,18 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late int _navIndex =
       widget.initialTabIndex; // 0 Jadwal, 1 Antrian, 2 Riwayat, 3 Pengaturan
   String _filterLokasi = 'Semua';
+  Timer? _pollingAntrian;
 
   static const _filterOptions = ['Semua', 'Bandung', 'Jember'];
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // NOTE: dialog izin notifikasi device SUDAH DIPINDAH ke ETiketScreen,
     // muncul sekali begitu pendonor selesai mendaftar antrian (bukan di
     // sini lagi) -- lihat showNotifikasiPermissionDialog().
@@ -52,9 +56,47 @@ class _HomeScreenState extends State<HomeScreen> {
       if (token != null) {
         context.read<AntrianProvider>().muatAntrianSaya(token: token);
         context.read<RiwayatProvider>().muatRiwayat(token: token);
+        context.read<NotifikasiProvider>().muatNotifikasi(token: token);
       }
-      context.read<NotifikasiProvider>().muatNotifikasi();
     });
+    _mulaiPollingAntrian();
+  }
+
+  @override
+  void dispose() {
+    _pollingAntrian?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Backend belum kirim push notification asli begitu petugas manggil
+    // nomor (Notifikasi_service cuma nyimpen in-app, lihat catatan di
+    // NotifikasiProvider) -- jadi status antrian di-refresh manual tiap
+    // app balik ke foreground, biar nggak ketinggalan info kalau
+    // nomornya udah dipanggil pas app di-minimize.
+    if (state == AppLifecycleState.resumed) {
+      _refreshAntrianSekarang();
+    }
+  }
+
+  void _mulaiPollingAntrian() {
+    // Poll tiap 10 detik SELAMA HomeScreen kebuka -- workaround karena
+    // belum ada push notification asli dari backend. Kalau nanti
+    // backend sudah kirim FCM beneran, timer ini bisa dihapus atau
+    // dinaikkan intervalnya jadi lebih jarang (cuma fallback).
+    _pollingAntrian = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _refreshAntrianSekarang(),
+    );
+  }
+
+  void _refreshAntrianSekarang() {
+    if (!mounted) return;
+    final token = context.read<AuthProvider>().token;
+    if (token == null) return;
+    context.read<AntrianProvider>().muatAntrianSaya(token: token);
   }
 
   @override
@@ -91,9 +133,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final auth = context.watch<AuthProvider>();
     final pendonor = auth.pendonor;
     final jadwalProvider = context.watch<JadwalProvider>();
-    // BARU: dulu stat card ini isinya placeholder statis ("- kali", "-
-    // hari") -- sekarang dipakaikan data ASLI dari GET /riwayat (FR-8.3)
-    // yang sudah di-fetch di initState(), bukan dihitung ulang di client.
     final riwayatProvider = context.watch<RiwayatProvider>();
 
     final daftarJadwal = _filterLokasi == 'Semua'
@@ -113,11 +152,9 @@ class _HomeScreenState extends State<HomeScreen> {
             golonganDarah: pendonor?.golonganDarah ?? '-',
             siapDonor: riwayatProvider.bolehDonorSekarang,
             totalDonor: '${riwayatProvider.jumlahDonorBerhasil} kali',
-            sejakTerakhir:
-                riwayatProvider.bolehDonorSekarang ||
-                    riwayatProvider.estimasiDonorBerikutnya == null
-                ? 'Siap sekarang'
-                : 'Boleh lagi ${_formatTanggal(riwayatProvider.estimasiDonorBerikutnya!)}',
+            sejakTerakhir: riwayatProvider.estimasiDonorBerikutnya != null
+                ? 'Boleh lagi ${_formatTanggal(riwayatProvider.estimasiDonorBerikutnya!)}'
+                : 'Siap sekarang',
           ),
           const SizedBox(height: 24),
           _buildSearchField(),
@@ -249,8 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _buildInfoOtomatis(),
         // FR-4.4: batalkan & jadwal ulang cuma relevan selama status
         // masih 'menunggu' -- backend menolak kalau sudah dipanggil/
-        // sedang diproses/selesai (lihat Antrian::batalkan()/
-        // jadwal_ulang() di backend, keduanya cek status di sana).
+        // diproses (lihat Antrian::batalkan()/jadwal_ulang()).
         if (antrian.status == StatusAntrian.menunggu) ...[
           const SizedBox(height: 12),
           _buildTombolBatalkanJadwalUlang(antrian),
@@ -301,8 +337,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// FR-4.4: PUT /antrian/:id/batalkan lewat AntrianProvider.batalkan().
-  /// Slot langsung dikembalikan ke kuota tersedia oleh backend.
   Future<void> _konfirmasiBatalkanAntrian(AntrianDonor antrian) async {
     final konfirmasi = await showDialog<bool>(
       context: context,
@@ -315,7 +349,6 @@ class _HomeScreenState extends State<HomeScreen> {
           'dikembalikan ke kuota tersedia.',
           style: AppText.helper,
         ),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -353,15 +386,14 @@ class _HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Antrian berhasil dibatalkan')),
       );
-    } catch (e) {
+    } on Exception catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal membatalkan antrian, coba lagi')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
-  /// FR-4.4: buka layar pilih jadwal baru buat PUT /antrian/:id/jadwal-ulang.
   void _bukaJadwalUlang(AntrianDonor antrian) {
     Navigator.push(
       context,

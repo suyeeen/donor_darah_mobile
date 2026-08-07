@@ -1,4 +1,5 @@
 import '../models/pendonor.dart';
+import '../utils/json_parse.dart';
 import 'api_client.dart';
 
 /// Hasil panggilan register/resend-otp -- backend kadang nyelipin
@@ -18,8 +19,8 @@ class HasilKirimOtp {
 
   factory HasilKirimOtp.fromJson(Map<String, dynamic> json) {
     return HasilKirimOtp(
-      otpTerkirim: json['otp_terkirim'] as bool? ?? false,
-      otpBerlakuMenit: json['otp_berlaku_menit'] as int? ?? 5,
+      otpTerkirim: parseBoolField(json['otp_terkirim']),
+      otpBerlakuMenit: parseIntField(json['otp_berlaku_menit'], fallback: 5),
       otpDevOnly: json['otp_code_DEV_ONLY'] as String?,
     );
   }
@@ -56,7 +57,7 @@ class SesiPerangkat {
 
   factory SesiPerangkat.fromJson(Map<String, dynamic> json) {
     return SesiPerangkat(
-      idSesi: json['id_sesi'] as int,
+      idSesi: parseIntField(json['id_sesi']),
       jti: json['jti'] as String,
       deviceInfo: json['device_info'] as String?,
       ipAddress: json['ip_address'] as String?,

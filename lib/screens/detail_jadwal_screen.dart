@@ -8,7 +8,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_exception.dart';
 import '../theme/app_theme.dart';
 import 'e_tiket_screen.dart';
-import 'hasil_kuesioner_screen.dart';
+import 'kuesioner_screen.dart';
 import 'papan_antrian_screen.dart';
 
 class DetailJadwalScreen extends StatefulWidget {
@@ -28,13 +28,6 @@ class _DetailJadwalScreenState extends State<DetailJadwalScreen> {
   /// FR-4.1: langsung POST /antrian -- TIDAK ada lagi langkah "pilih slot
   /// waktu" (backend cuma punya 1 slot_waktu tetap per jadwal_donor, jadi
   /// PilihSlotWaktuScreen yang lama sudah tidak relevan buat alur ini).
-  ///
-  /// FIX: sebelumnya method ini manggil antrianProvider.ambilNomor() TANPA
-  /// token -- padahal Antrian.php WAJIB Authorization: Bearer <token>
-  /// (verify_token() dipanggil di constructor-nya). Akibatnya request ini
-  /// SELALU gagal 401 "Token tidak ditemukan" walau pendonor sudah login.
-  /// Sekarang token diambil dari AuthProvider dan diteruskan ke
-  /// AntrianProvider.ambilNomor() / AntrianService.ambilNomor().
   Future<void> _ambilNomorAntrian() async {
     setState(() => _sedangProses = true);
 
@@ -111,7 +104,7 @@ class _DetailJadwalScreenState extends State<DetailJadwalScreen> {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const HasilKuesionerScreen()),
+                MaterialPageRoute(builder: (_) => const KuesionerScreen()),
               );
             },
             child: const Text('Isi sekarang'),
@@ -211,8 +204,7 @@ class _DetailJadwalScreenState extends State<DetailJadwalScreen> {
                   ),
                   const SizedBox(height: 10),
                   // FR-5.4: papan antrian publik, TANPA token -- boleh
-                  // dilihat siapa saja termasuk sebelum ambil nomor,
-                  // dipajang di layar/TV lokasi (lihat Papan.php backend).
+                  // dilihat siapa saja termasuk sebelum ambil nomor.
                   SizedBox(
                     height: 44,
                     child: OutlinedButton.icon(

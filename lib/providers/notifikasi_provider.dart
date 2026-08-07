@@ -1,12 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/notifikasi.dart';
+import '../services/api_exception.dart';
+import '../services/notifikasi_service.dart';
 
 enum NotifikasiStatusFetch { idle, loading, loaded, error }
 
 class NotifikasiProvider extends ChangeNotifier {
   static const _keySudahTanyaIzin = 'notif_sudah_tanya_izin';
   static const _keyNotifikasiAktif = 'notif_aktif';
+
+  final NotifikasiService _service = NotifikasiService();
 
   NotifikasiStatusFetch status = NotifikasiStatusFetch.idle;
   List<NotifikasiItem> daftarNotifikasi = [];
@@ -23,24 +27,36 @@ class NotifikasiProvider extends ChangeNotifier {
   /// dipanggil, tersisa sekian orang di depan, dst).
   bool notifikasiAktif = false;
 
-  // TODO: sambungin ke endpoint backend notifikasi (belum tersedia),
-  // sementara list-nya kosong biar UI empty state kepakai dulu.
-  Future<void> muatNotifikasi() async {
-    status = NotifikasiStatusFetch.loading;
-    notifyListeners();
-    try {
+  /// FR-6.x: GET /notifikasi. Kalau [token] null (belum login), daftar
+  /// dikosongkan begitu saja tanpa error -- wajar buat kondisi belum
+  /// login (mis. dipanggil dari SplashScreen sebelum auth selesai).
+  Future<void> muatNotifikasi({String? token}) async {
+    if (token == null) {
       daftarNotifikasi = [];
       status = NotifikasiStatusFetch.loaded;
+      notifyListeners();
+      return;
+    }
+
+    status = NotifikasiStatusFetch.loading;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      daftarNotifikasi = await _service.daftarNotifikasi(token: token);
+      status = NotifikasiStatusFetch.loaded;
+    } on ApiException catch (e) {
+      status = NotifikasiStatusFetch.error;
+      errorMessage = e.message;
     } catch (e) {
       status = NotifikasiStatusFetch.error;
-      errorMessage = e.toString();
+      errorMessage = 'Terjadi kesalahan tak terduga';
     }
     notifyListeners();
   }
 
-  List<NotifikasiItem> filter(KategoriNotifikasi? kategori) {
-    if (kategori == null) return daftarNotifikasi;
-    return daftarNotifikasi.where((n) => n.kategori == kategori).toList();
+  List<NotifikasiItem> filter(JenisNotifikasi? jenis) {
+    if (jenis == null) return daftarNotifikasi;
+    return daftarNotifikasi.where((n) => n.jenis == jenis).toList();
   }
 
   int get jumlahBelumDibaca =>

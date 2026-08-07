@@ -1,3 +1,5 @@
+import '../utils/json_parse.dart';
+
 /// Model Modul 4 -- cocok persis sama bentuk respons Antrian::format_e_ticket()
 /// di backend (lihat Antrian.php). SEMUA field di sini nullable/opsional
 /// sesuai kondisi nyata: `jadwal` & `posisi` bisa null tergantung konteks.
@@ -58,10 +60,10 @@ class JadwalRingkasAntrian {
 
   factory JadwalRingkasAntrian.fromJson(Map<String, dynamic> json) {
     return JadwalRingkasAntrian(
-      idJadwal: json['id_jadwal'] as int,
+      idJadwal: parseIntField(json['id_jadwal']),
       tanggal: DateTime.parse(json['tanggal'] as String),
       slotWaktu: json['slot_waktu'] as String,
-      idLokasi: json['id_lokasi'] as int,
+      idLokasi: parseIntField(json['id_lokasi']),
       namaLokasi: json['nama_lokasi'] as String?,
       alamat: json['alamat'] as String?,
     );
@@ -85,9 +87,9 @@ class PosisiAntrian {
 
   factory PosisiAntrian.fromJson(Map<String, dynamic> json) {
     return PosisiAntrian(
-      nomorSedangDilayani: json['nomor_sedang_dilayani'] as int?,
-      jumlahDiDepan: json['jumlah_di_depan'] as int? ?? 0,
-      estimasiMenit: json['estimasi_menit'] as int? ?? 0,
+      nomorSedangDilayani: parseIntFieldOrNull(json['nomor_sedang_dilayani']),
+      jumlahDiDepan: parseIntField(json['jumlah_di_depan']),
+      estimasiMenit: parseIntField(json['estimasi_menit']),
     );
   }
 }
@@ -115,8 +117,8 @@ class AntrianDonor {
 
   factory AntrianDonor.fromJson(Map<String, dynamic> json) {
     return AntrianDonor(
-      idAntrian: json['id_antrian'] as int,
-      nomorUrut: json['nomor_urut'] as int,
+      idAntrian: parseIntField(json['id_antrian']),
+      nomorUrut: parseIntField(json['nomor_urut']),
       status: StatusAntrian.fromApi(json['status'] as String),
       qrCode: json['qr_code'] as String,
       batasWaktuCheckin: json['batas_waktu_checkin'] != null
@@ -134,11 +136,8 @@ class AntrianDonor {
   }
 }
 
-/// Satu baris riwayat dari GET /antrian/saya (field "riwayat") -- GAP:
-/// backend ambil ini dari Antrian_model::get_riwayat_by_pendonor(), gue
-/// belum baca isi model itu jadi bentuknya nebak berdasarkan pola
-/// Riwayat::index() yang mirip. Kalau field-nya beda pas dites, ini yang
-/// pertama perlu dicek.
+/// Satu baris riwayat dari GET /antrian/saya (field "riwayat") -- field-nya
+/// cocok sama Antrian_model::get_riwayat_by_pendonor() di backend.
 class RiwayatAntrianRingkas {
   final int idAntrian;
   final int nomorUrut;
@@ -158,8 +157,8 @@ class RiwayatAntrianRingkas {
 
   factory RiwayatAntrianRingkas.fromJson(Map<String, dynamic> json) {
     return RiwayatAntrianRingkas(
-      idAntrian: json['id_antrian'] as int,
-      nomorUrut: json['nomor_urut'] as int,
+      idAntrian: parseIntField(json['id_antrian']),
+      nomorUrut: parseIntField(json['nomor_urut']),
       status: StatusAntrian.fromApi(json['status'] as String),
       tanggal: DateTime.parse(json['tanggal'] as String),
       slotWaktu: json['slot_waktu'] as String,

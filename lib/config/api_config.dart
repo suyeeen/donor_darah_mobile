@@ -1,21 +1,7 @@
 class ApiConfig {
   ApiConfig._();
 
-  // =========================================================================
-  // BLOCKER: ganti nilai ini begitu dapet base URL dari temen.
-  //
-  // Backend routing-nya clean URL tanpa index.php (lihat routes.php +
-  // .htaccess), base_url CI3 di server itu 'http://localhost/sistem-antrian-donor'
-  // buat dev lokal temen -- jadi pola base URL API kemungkinan:
-  //   http://<host-atau-ip>/sistem-antrian-donor/api
-  // atau kalau di-deploy di root domain:
-  //   http://<host-atau-ip>/api
-  //
-  // Untuk emulator Android yang ngakses server di localhost mesin dev,
-  // pakai 10.0.2.2 (bukan 127.0.0.1/localhost), atau IP LAN kalau test di
-  // HP fisik.
-  // =========================================================================
-  static const String baseUrl = 'http://localhost/sistem-antrian-donor/api';
+  static const String baseUrl = 'http://10.0.2.2/sistem-antrian-donor/api';
 
   static const Duration timeout = Duration(seconds: 15);
 
