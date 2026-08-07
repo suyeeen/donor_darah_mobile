@@ -46,9 +46,12 @@ class _HomeScreenState extends State<HomeScreen> {
     // muncul sekali begitu pendonor selesai mendaftar antrian (bukan di
     // sini lagi) -- lihat showNotifikasiPermissionDialog().
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final token = context.read<AuthProvider>().token;
       context.read<JadwalProvider>().cariJadwal();
-      context.read<AntrianProvider>().muatAntrianSaya();
-      context.read<RiwayatProvider>().muatRiwayat();
+      if (token != null) {
+        context.read<AntrianProvider>().muatAntrianSaya(token: token);
+        context.read<RiwayatProvider>().muatRiwayat(token: token);
+      }
       context.read<NotifikasiProvider>().muatNotifikasi();
     });
   }
@@ -197,7 +200,11 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    if (provider.daftarAntrian.isEmpty) {
+    final daftarAntrian = provider.antrianAktif != null
+        ? [provider.antrianAktif!]
+        : <AntrianDonor>[];
+
+    if (daftarAntrian.isEmpty) {
       return _buildEmptyState(
         icon: Icons.confirmation_number_outlined,
         judul: 'Belum ada antrian aktif',
@@ -211,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final antrian in provider.daftarAntrian) ...[
+          for (final antrian in daftarAntrian) ...[
             _buildAntrianCard(antrian),
             const SizedBox(height: 12),
           ],
@@ -301,14 +308,14 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(
                 child: _buildStatChipTerang(
                   'Di depan',
-                  '${antrian.jumlahDidepan} orang',
+                  '${antrian.posisi?.jumlahDiDepan ?? 0} orang',
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _buildStatChipTerang(
                   'Estimasi',
-                  '${antrian.estimasiMenit} mnt',
+                  '${antrian.posisi?.estimasiMenit ?? 0} mnt',
                 ),
               ),
             ],
@@ -678,6 +685,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _buildEstimasiDonorBerikutnyaBanner(provider),
           for (final riwayat in provider.daftarRiwayat) ...[
             _buildRiwayatCard(riwayat),
             const SizedBox(height: 12),
@@ -687,8 +695,44 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // FR-8.3: kapan boleh donor lagi (BR2, interval 3 bulan sejak donor
+  // terakhir yang statusnya 'selesai') -- langsung dari backend, jangan
+  // dihitung ulang di client.
+  Widget _buildEstimasiDonorBerikutnyaBanner(RiwayatProvider provider) {
+    final estimasi = provider.estimasiDonorBerikutnya;
+    final pesan = provider.bolehDonorSekarang || estimasi == null
+        ? 'Anda sudah boleh donor lagi sekarang.'
+        : 'Anda bisa donor lagi mulai ${_formatTanggal(estimasi)}.';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.tabInactiveBg,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              provider.bolehDonorSekarang
+                  ? Icons.check_circle_outline
+                  : Icons.event_available_outlined,
+              size: 16,
+              color: provider.bolehDonorSekarang
+                  ? AppColors.success
+                  : AppColors.neutralMuted,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(pesan, style: AppText.helper)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildRiwayatCard(RiwayatDonor riwayat) {
-    final statusInfo = _statusKelayakanInfo(riwayat.statusKelayakan);
+    final statusInfo = _statusRiwayatInfo(riwayat);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -708,7 +752,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      riwayat.lokasi.namaLokasi,
+                      riwayat.namaLokasi ?? 'Lokasi tidak diketahui',
                       style: AppText.inputText.copyWith(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
@@ -716,7 +760,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      _formatTanggal(riwayat.tanggal),
+                      '${_formatTanggal(riwayat.tanggal)} · ${riwayat.slotWaktu}',
                       style: AppText.helper.copyWith(fontSize: 11.5),
                     ),
                   ],
@@ -758,21 +802,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ],
-          if (riwayat.catatanPetugas != null) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.tabInactiveBg,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                riwayat.catatanPetugas!,
-                style: AppText.helper.copyWith(fontSize: 11),
-              ),
-            ),
-          ],
-          if (riwayat.statusKelayakan == StatusKelayakan.layak) ...[
+          if (riwayat.sertifikatTersedia) ...[
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
@@ -780,7 +810,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => SertifikatScreen(riwayat: riwayat),
+                    builder: (_) =>
+                        SertifikatScreen(idAntrian: riwayat.idAntrian),
                   ),
                 ),
                 icon: const Icon(Icons.workspace_premium_outlined, size: 16),
@@ -799,14 +830,34 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  (String, Color) _statusKelayakanInfo(StatusKelayakan status) {
-    switch (status) {
-      case StatusKelayakan.layak:
-        return ('Layak', AppColors.success);
-      case StatusKelayakan.tidakLayak:
-        return ('Tidak layak', AppColors.primary);
-      case StatusKelayakan.ditunda:
-        return ('Ditunda', AppColors.neutralMuted);
+  // Badge status riwayat: pakai status_kelayakan kalau petugas sudah
+  // input hasil skrining (null-nya berarti belum ada hasil_donor sama
+  // sekali -- mis. antrian masih berjalan, tidak hadir, atau dibatalkan),
+  // fallback ke status antrian buat kasus itu.
+  (String, Color) _statusRiwayatInfo(RiwayatDonor riwayat) {
+    final kelayakan = riwayat.statusKelayakan;
+    if (kelayakan != null) {
+      switch (kelayakan) {
+        case StatusKelayakan.layak:
+          return ('Layak', AppColors.success);
+        case StatusKelayakan.tidakLayak:
+          return ('Tidak layak', AppColors.primary);
+        case StatusKelayakan.ditunda:
+          return ('Ditunda', AppColors.neutralMuted);
+      }
+    }
+
+    switch (riwayat.status) {
+      case StatusAntrian.menunggu:
+      case StatusAntrian.dipanggil:
+      case StatusAntrian.sedangDiproses:
+        return ('Berjalan', AppColors.neutralMuted);
+      case StatusAntrian.selesai:
+        return ('Menunggu hasil', AppColors.neutralMuted);
+      case StatusAntrian.tidakHadir:
+        return ('Tidak hadir', AppColors.neutralMuted);
+      case StatusAntrian.dibatalkan:
+        return ('Dibatalkan', AppColors.neutralMuted);
     }
   }
 
@@ -1220,25 +1271,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _infoRowSimpel(IconData icon, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: AppColors.neutralMuted),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            value,
-            style: AppText.inputText.copyWith(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   String _formatTanggal(DateTime tanggal) {
     const hari = [
       'Senin',
@@ -1265,12 +1297,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
     return '${hari[tanggal.weekday - 1]}, ${tanggal.day} '
         '${bulan[tanggal.month - 1]} ${tanggal.year}';
-  }
-
-  String _formatJam(DateTime waktu) {
-    final j = waktu.hour.toString().padLeft(2, '0');
-    final m = waktu.minute.toString().padLeft(2, '0');
-    return '$j:$m';
   }
 
   Widget _buildGreetingHeader(String? nama) {

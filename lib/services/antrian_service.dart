@@ -1,6 +1,6 @@
 import '../models/antrian_donor.dart';
 import 'api_client.dart';
-import 'api_exception.dart';
+// import 'api_exception.dart';
 
 /// Modul 4 -- kontrak persis dari Antrian.php backend. Semua endpoint di
 /// sini wajib token (Antrian.php manggil verify_token() + verify_role
@@ -24,9 +24,7 @@ class AntrianService {
   }
 
   /// GET /antrian/saya
-  Future
-    ({AntrianDonor? antrianAktif, List<RiwayatAntrianRingkas> riwayat})
-  >
+  Future<({AntrianDonor? antrianAktif, List<RiwayatAntrianRingkas> riwayat})>
   antrianSaya({required String token}) async {
     final data = await _client.get('/antrian/saya', token: token);
 
@@ -52,10 +50,7 @@ class AntrianService {
 
   /// PUT /antrian/:id/batalkan -- cuma bisa kalau status masih 'menunggu'
   /// DAN jadwal belum mulai (dicek server, bukan client).
-  Future<void> batalkan({
-    required int idAntrian,
-    required String token,
-  }) async {
+  Future<void> batalkan({required int idAntrian, required String token}) async {
     await _client.put('/antrian/$idAntrian/batalkan', token: token);
   }
 

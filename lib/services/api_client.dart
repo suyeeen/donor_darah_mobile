@@ -40,6 +40,54 @@ class ApiClient {
     String? token,
   }) => _send('PUT', path, body: body, token: token);
 
+  /// Buat endpoint yang balikin file mentah (bukan envelope JSON biasa),
+  /// mis. GET /riwayat/:id/sertifikat yang stream PDF langsung dari
+  /// server (lihat Riwayat::sertifikat() di backend). Kalau server malah
+  /// balikin JSON (kasus error -- 404/400 sebelum sempat generate PDF),
+  /// pesannya diparse dan dilempar sebagai ApiException seperti biasa.
+  Future<List<int>> getBytes(String path, {String? token}) async {
+    final uri = ApiConfig.uri(path);
+    final headers = <String, String>{
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+
+    http.Response response;
+    try {
+      response = await http
+          .get(uri, headers: headers)
+          .timeout(ApiConfig.timeout);
+    } on SocketException {
+      throw ApiException(
+        'Tidak bisa terhubung ke server. Cek koneksi internet atau '
+        'pastikan base URL API di ApiConfig sudah benar.',
+      );
+    } on HttpException {
+      throw ApiException('Gagal menghubungi server, coba lagi.');
+    } catch (e) {
+      throw ApiException('Waktu permintaan habis, coba lagi. ($e)');
+    }
+
+    final contentType = response.headers['content-type'] ?? '';
+    if (response.statusCode == 200 && contentType.contains('application/pdf')) {
+      return response.bodyBytes;
+    }
+
+    // Bukan PDF -- backend cuma kirim ini lewat json_response() kalau
+    // gagal sebelum sempat generate file (lihat Riwayat::sertifikat()).
+    try {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final message =
+          decoded['message'] as String? ??
+          'Gagal mengunduh sertifikat, coba lagi.';
+      throw ApiException(message, statusCode: response.statusCode);
+    } on FormatException {
+      throw ApiException(
+        'Respons server tidak bisa dibaca (status ${response.statusCode}).',
+        statusCode: response.statusCode,
+      );
+    }
+  }
+
   Future<Map<String, dynamic>> _send(
     String method,
     String path, {

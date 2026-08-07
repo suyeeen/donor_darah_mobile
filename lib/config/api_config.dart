@@ -23,7 +23,7 @@ class ApiConfig {
   // pakai 10.0.2.2 (bukan 127.0.0.1/localhost), atau IP LAN kalau test di
   // HP fisik.
   // =========================================================================
-  static const String baseUrl = 'http://10.0.2.2/sistem-antrian-donor/api';
+  static const String baseUrl = 'http://localhost/sistem-antrian-donor/api';
 
   static const Duration timeout = Duration(seconds: 15);
 
@@ -69,6 +69,15 @@ class ApiConfig {
   // Papan Antrian Digital (Modul 5) -- publik, tanpa token.
   // ---------------------------------------------------------------------
   static const String papanAntrian = '/papan-antrian';
+
+  // ---------------------------------------------------------------------
+  // Riwayat & Sertifikat Donor (FR-8.1 - FR-8.3) -- wajib token & role
+  // pendonor (lihat Riwayat.php). /sertifikat balikin file PDF langsung
+  // (bukan JSON envelope biasa), lihat ApiClient.getBytes().
+  // ---------------------------------------------------------------------
+  static const String riwayat = '/riwayat';
+  static String riwayatSertifikat(int idAntrian) =>
+      '/riwayat/$idAntrian/sertifikat';
 
   static Uri uri(String path, [Map<String, String>? query]) {
     return Uri.parse('$baseUrl$path').replace(queryParameters: query);

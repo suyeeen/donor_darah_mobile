@@ -6,7 +6,7 @@ import '../theme/app_theme.dart';
 /// FR-1.3: Lupa Kata Sandi. Backend cuma expose 2 endpoint terpisah
 /// (forgot-password kirim link/token ke email, reset-password submit
 /// token+password baru) -- TIDAK ada deep link handling di app ini
-/// (reset_link di email berbentuk URL web `<base_url>/reset-password?
+/// (reset_link di email berbentuk URL web `&lt;base_url&gt;/reset-password?
 /// token=...`), jadi screen ini dibikin 2 tahap manual:
 ///   Tahap 1: masukin email -> server "kirim" instruksi ke email
 ///   Tahap 2: user tempel token dari email + isi password baru

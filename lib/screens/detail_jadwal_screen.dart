@@ -4,7 +4,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/jadwal_donor.dart';
 import '../providers/antrian_provider.dart';
-import '../providers/auth_provider.dart';
 import '../services/api_exception.dart';
 import '../theme/app_theme.dart';
 import 'e_tiket_screen.dart';
