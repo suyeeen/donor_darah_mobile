@@ -828,11 +828,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     if (provider.daftarRiwayat.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.history,
-        judul: 'Belum ada riwayat donor',
-        pesan:
-            'Riwayat donor Anda bakal muncul di sini setelah donor pertama selesai.',
+      return SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(21, 20, 21, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildRiwayatHeader(),
+            const SizedBox(height: 8),
+            _buildEmptyState(
+              icon: Icons.workspace_premium_outlined,
+              judul: 'Belum ada riwayat donor',
+              pesan:
+                  'Riwayat & sertifikat donor Anda bakal muncul di sini '
+                  'setelah donor pertama selesai diproses petugas.',
+            ),
+          ],
+        ),
       );
     }
 
@@ -841,6 +852,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _buildRiwayatHeader(),
+          const SizedBox(height: 16),
           _buildEstimasiDonorBerikutnyaBanner(provider),
           for (final riwayat in provider.daftarRiwayat) ...[
             _buildRiwayatCard(riwayat),
@@ -848,6 +861,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ],
         ],
       ),
+    );
+  }
+
+  // FIX: tab ini dulu cuma berlabel "Riwayat" tanpa framing sertifikat,
+  // padahal end-to-end fiturnya (petugas input hasil donor lewat
+  // admin/Antrian::selesai() -> hasil_donor.status_kelayakan == 'layak' ->
+  // RiwayatDonor.sertifikatTersedia -> tombol "Lihat Sertifikat" di
+  // _buildRiwayatCard -> SertifikatScreen unduh PDF) sudah lengkap
+  // tersambung ke backend. Header ini disamakan dengan label navbar versi
+  // web punya backend ("Riwayat & Sertifikat") supaya jelas kalau
+  // sertifikat adalah hasil/capaian dari riwayat donor yang sudah selesai
+  // diproses petugas, bukan sekadar daftar log biasa.
+  Widget _buildRiwayatHeader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Riwayat & Sertifikat',
+          style: AppText.headline.copyWith(fontSize: 20),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Sertifikat donor terbit otomatis untuk tiap kunjungan yang '
+          'sudah diproses dan dinyatakan layak oleh petugas.',
+          style: AppText.helper,
+        ),
+      ],
     );
   }
 

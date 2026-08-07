@@ -1,11 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/antrian_donor.dart';
+import '../providers/notifikasi_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/notifikasi_permission_dialog.dart';
 
-class ETiketScreen extends StatelessWidget {
+/// FIX: dialog izin notifikasi ("Aktifkan Notifikasi pada Device") sekarang
+/// dipicu DI SINI, bukan lagi di AuthScreen saat proses daftar. Alasannya:
+/// dulu dialog itu ditampilkan sebelum OTP diverifikasi, padahal
+/// AuthProvider.token masih null di titik itu -- akibatnya pendaftaran FCM
+/// token ke backend (NotifikasiService.daftarkanToken) selalu gagal diam-
+/// diam, SEMENTARA flag "sudah pernah tanya" di SharedPreferences sudah
+/// kadung ditandai true, jadi dialog tidak pernah muncul lagi walau user
+/// sudah login. Ujung-ujungnya device_tokens di backend tidak pernah
+/// terisi -> notifikasi mengambang (heads-up) tidak pernah muncul saat
+/// petugas memanggil nomor antrian.
+///
+/// Titik ini (begitu e-ticket tampil, tepat setelah ambil nomor antrian)
+/// jauh lebih tepat: AuthProvider.token DIJAMIN sudah terisi (DetailJadwal-
+/// Screen mensyaratkan token non-null sebelum bisa ambil nomor sama
+/// sekali, lihat _ambilNomorAntrian()), dan momen ini juga lebih relevan
+/// buat user -- baru dapat nomor, jadi wajar ditawari notifikasi.
+class ETiketScreen extends StatefulWidget {
   final AntrianDonor antrian;
 
   const ETiketScreen({super.key, required this.antrian});
+
+  @override
+  State<ETiketScreen> createState() => _ETiketScreenState();
+}
+
+class _ETiketScreenState extends State<ETiketScreen> {
+  AntrianDonor get antrian => widget.antrian;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tawarkanNotifikasi());
+  }
+
+  Future<void> _tawarkanNotifikasi() async {
+    final notifProvider = context.read<NotifikasiProvider>();
+    await notifProvider.cekSudahTanyaIzinDevice();
+    if (!notifProvider.sudahTanyaIzinDevice && mounted) {
+      await showNotifikasiPermissionDialog(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

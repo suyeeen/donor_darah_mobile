@@ -8,11 +8,15 @@ import '../theme/app_theme.dart';
 
 /// Dialog "Aktifkan Notifikasi pada Device".
 ///
-/// Ditampilkan SEKALI, tepat setelah pendonor selesai mendaftar/ambil
-/// nomor antrian (di ETiketScreen) -- bukan saat pertama buka Home --
-/// karena di titik itulah notifikasi jadi relevan: dipakai buat ngasih
-/// kabar realtime selama antrian pendonor masih aktif (nomor dipanggil,
-/// tersisa sekian orang di depan, dst).
+/// Ditampilkan SEKALI, tepat setelah pendonor mengambil nomor antrian (di
+/// ETiketScreen -- lihat _tawarkanNotifikasi() di sana) -- bukan saat
+/// pertama buka Home ataupun saat proses daftar, karena di titik itulah
+/// notifikasi jadi relevan: dipakai buat ngasih kabar realtime selama
+/// antrian pendonor masih aktif (nomor dipanggil, tersisa sekian orang di
+/// depan, dst). PENTING: dialog ini butuh AuthProvider.token yang SUDAH
+/// terisi (dipakai buat POST /notifikasi/device-token) -- jangan panggil
+/// dari alur sebelum login selesai (mis. sebelum OTP diverifikasi),
+/// karena pendaftaran token akan gagal diam-diam kalau token masih null.
 Future<void> showNotifikasiPermissionDialog(BuildContext context) async {
   final notifProvider = context.read<NotifikasiProvider>();
   final authToken = context.read<AuthProvider>().token;
@@ -98,8 +102,7 @@ Future<void> showNotifikasiPermissionDialog(BuildContext context) async {
                         // Ambil token FCM device ini, lalu daftarkan ke
                         // backend supaya petugas panggil antrian bisa
                         // mem-push notifikasi ke device ini.
-                        final fcmToken = await PushNotificationService
-                            .instance
+                        final fcmToken = await PushNotificationService.instance
                             .ambilToken();
 
                         if (fcmToken != null && authToken != null) {

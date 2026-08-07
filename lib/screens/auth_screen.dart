@@ -5,8 +5,6 @@ import '../theme/app_theme.dart';
 import 'home_screen.dart';
 import 'lupa_password_screen.dart';
 import 'verifikasi_otp_screen.dart';
-import '../providers/notifikasi_provider.dart';
-import '../widgets/notifikasi_permission_dialog.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -101,16 +99,20 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!mounted) return;
 
     if (sukses) {
-      // Popup izin notifikasi ditampilkan DI SINI, sebelum ke layar OTP --
-      // biar tetap satu kali saja per instalasi (flag di SharedPreferences,
-      // sama seperti dicek juga di ETiketScreen).
-      final notifProvider = context.read<NotifikasiProvider>();
-      await notifProvider.cekSudahTanyaIzinDevice();
-      if (!notifProvider.sudahTanyaIzinDevice && mounted) {
-        await showNotifikasiPermissionDialog(context);
-      }
-
-      if (!mounted) return;
+      // FIX: popup izin notifikasi SENGAJA TIDAK ditampilkan di sini lagi.
+      // Dulu dipanggil persis di titik ini, padahal AuthProvider.token
+      // masih null (akun baru aktif setelah OTP diverifikasi) -- akibatnya
+      // pendaftaran FCM token ke backend (NotifikasiService.daftarkanToken)
+      // selalu gagal diam-diam karena syarat `authToken != null` tidak
+      // pernah terpenuhi, SEMENTARA flag "sudah pernah tanya" di
+      // SharedPreferences sudah kadung ditandai true -- jadi dialog ini
+      // tidak akan pernah muncul lagi di sesi berikutnya walau user sudah
+      // login. Ini akar masalah "notifikasi mengambang tidak muncul saat
+      // antrian dipanggil": device_tokens di backend jadi tidak pernah
+      // terisi. Dialog sekarang dipindah ke ETiketScreen (lihat
+      // e_tiket_screen.dart), tepat setelah pendonor benar-benar login DAN
+      // sudah punya nomor antrian aktif -- di titik itu authToken pasti
+      // terisi dan notifikasi juga baru relevan secara kontekstual.
 
       // FR-1.1: akun belum aktif sampai OTP diverifikasi -- BUKAN langsung
       // ke Home. VerifikasiOtpScreen yang bakal auto-login & lempar ke
